@@ -43,7 +43,8 @@
         {
           "photosPermission": "Permite seleccionar una imagen como logo de tu negocio."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
