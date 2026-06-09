@@ -11,8 +11,9 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 
 - Crear presupuestos detallados en segundos
 - Gestionar el estado de cada presupuesto (borrador, enviado, aceptado, rechazado, pagado)
-- Compartir el presupuesto en PDF directamente desde el celular
-- Enviar el presupuesto por WhatsApp con un mensaje profesional pre-armado
+- Generar un PDF profesional con el logo y datos del negocio
+- Compartir el PDF desde el celular (WhatsApp, Gmail, Drive, etc.)
+- Imprimir o guardar el PDF directamente desde el dispositivo
 - Guardar plantillas de ítems para reutilizarlos en futuros presupuestos
 - Mantener un historial completo de todos los presupuestos emitidos
 
@@ -33,8 +34,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Nuevo presupuesto | Datos del cliente, ítems con cantidad y precio unitario, descuento fijo o porcentual, anticipo, notas |
 | Historial | Listado de todos los presupuestos con búsqueda y filtros por estado |
 | Detalle de presupuesto | Vista completa, cambio de estado, edición, eliminación |
-| Compartir PDF | Genera un PDF profesional y lo comparte desde el dispositivo |
-| Enviar por WhatsApp | Abre WhatsApp con un mensaje profesional pre-armado |
+| Compartir PDF | Genera un PDF profesional y abre el selector del sistema (WhatsApp, Gmail, Drive, etc.) |
+| Imprimir / Guardar PDF | Abre el diálogo de impresión del sistema, que también permite guardar como PDF |
 | Plantillas | Ítems predefinidos reutilizables para agilizar la carga |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
 
@@ -42,13 +43,16 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 
 ## Tecnologías utilizadas
 
-- **React Native** + **Expo SDK 54** (compatible con Expo Go)
+- **React Native 0.81** + **Expo SDK 54** (New Architecture habilitada)
 - **Firebase Auth** — autenticación de usuarios
 - **Cloud Firestore** — base de datos en tiempo real
 - **Firebase Storage** — almacenamiento del logo del negocio
 - **React Navigation v7** — navegación entre pantallas
-- **React Native Paper** — componentes de interfaz Material Design
-- **expo-print** + **expo-sharing** — generación y compartición de PDF
+- **React Native Paper v5** — componentes Material Design
+- **expo-print** — generación de PDF desde HTML e impresión
+- **expo-sharing** — compartición de archivos via share sheet del sistema
+- **expo-file-system** (legacy) — copia y gestión de archivos locales
+- **EAS Build** — builds de APK/AAB en la nube
 
 ---
 
@@ -56,8 +60,9 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 
 - Node.js 20 o superior
 - npm 10 o superior
-- Expo CLI (`npm install -g expo-cli`)
+- EAS CLI: `npm install -g eas-cli`
 - Cuenta de Firebase con proyecto configurado
+- Cuenta de Expo (para EAS Build)
 
 ---
 
@@ -65,21 +70,23 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/delgadoc86/presufacil.git
-cd presufacil
+git clone https://github.com/Delgadoc86/presupuestoapp.git
+cd presupuestoapp
 
 # 2. Instalar dependencias
 npm install
 
-# 3. Configurar Firebase (ver sección siguiente)
-
-# 4. Iniciar la app
+# 3. Iniciar la app en desarrollo
 npx expo start -c
 ```
 
 ### Configurar Firebase
 
-Crear el archivo `firebase.config.js` en la raíz con los datos de tu proyecto Firebase:
+El archivo `firebase.config.js` en la raíz del proyecto contiene la configuración de Firebase. Está commiteado en este repositorio para que EAS Build pueda compilar la app.
+
+> **Importante:** si vas a hacer un fork o usar este proyecto en un repositorio público, reemplazá las credenciales reales por las de tu propio proyecto Firebase y asegurate de que el repositorio sea privado, o usá [EAS Secrets](https://docs.expo.dev/build-reference/variables/) para no exponer credenciales.
+
+Estructura del archivo:
 
 ```js
 import { initializeApp } from 'firebase/app';
@@ -106,7 +113,17 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 ```
 
-> **Importante:** nunca subas `firebase.config.js` con credenciales reales a un repositorio público. Está incluido en `.gitignore`.
+---
+
+## Build de APK (EAS)
+
+```bash
+# Preview (APK para instalar directamente en Android)
+eas build --platform android --profile preview
+
+# Producción (AAB para Google Play Store)
+eas build --platform android --profile production
+```
 
 ---
 
@@ -126,14 +143,14 @@ service cloud.firestore {
     }
 
     match /quotes/{quoteId} {
-      allow read, write: if request.auth != null
+      allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.userId;
     }
 
     match /templates/{templateId} {
-      allow read, write: if request.auth != null
+      allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.userId;
@@ -151,7 +168,12 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /logos/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
@@ -163,10 +185,9 @@ service firebase.storage {
 
 | Permiso | Motivo |
 |---|---|
-| `READ_EXTERNAL_STORAGE` / `READ_MEDIA_IMAGES` | Seleccionar el logo del negocio desde la galería |
 | `INTERNET` | Sincronización con Firebase (autenticación, datos y archivos) |
-
-La app **no solicita** acceso a la cámara, ubicación, contactos, micrófono ni ningún otro permiso sensible.
+| `READ_MEDIA_IMAGES` / `READ_EXTERNAL_STORAGE` | Seleccionar el logo del negocio desde la galería |
+| `WRITE_EXTERNAL_STORAGE` | Guardar PDF generado en el dispositivo |
 
 ---
 
@@ -189,23 +210,38 @@ Para solicitar la eliminación de todos tus datos, contactá a: delgadocristian1
 ## Estructura del proyecto
 
 ```
-presufacil/
+presupuestoapp/
 ├── assets/                  # Íconos y recursos visuales
 ├── src/
 │   ├── components/          # Componentes reutilizables
-│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar
-│   │   ├── quotes/          # QuoteCard, QuoteItemRow, QuoteTotalsCard, etc.
+│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar, EmptyState
+│   │   ├── quotes/          # QuoteCard, QuoteItemRow, QuoteStatusBadge, QuoteTotalsCard
 │   │   └── templates/       # TemplateItemRow
 │   ├── context/             # AuthContext, BusinessContext, AppContext
+│   ├── data/                # defaultTemplates (plantillas predefinidas)
 │   ├── hooks/               # useBusiness, useQuotes, useTemplates
 │   ├── navigation/          # AppNavigator, AppTabNavigator, AuthNavigator
-│   ├── screens/             # Todas las pantallas agrupadas por módulo
-│   ├── services/            # Lógica de Firebase (auth, business, quotes, storage, pdf)
-│   ├── theme/               # Colores y tema de Material Design
+│   ├── screens/             # Pantallas agrupadas por módulo
+│   │   ├── auth/            # Login, Register, ForgotPassword
+│   │   ├── history/         # HistoryScreen
+│   │   ├── home/            # HomeScreen
+│   │   ├── onboarding/      # BusinessSetupScreen
+│   │   ├── quotes/          # QuoteDetailScreen, QuoteFormScreen
+│   │   └── settings/        # Settings, BusinessProfile, Account, Templates
+│   ├── services/            # Lógica de Firebase y funciones de negocio
+│   │   ├── auth.service.js
+│   │   ├── business.service.js
+│   │   ├── pdf.service.js   # Generación, compartición e impresión de PDF
+│   │   ├── quotes.service.js
+│   │   ├── storage.service.js
+│   │   └── templates.service.js
+│   ├── theme/               # Colores y tema Material Design
 │   └── utils/               # Constantes, formateadores, plantilla HTML del PDF
 ├── App.js                   # Punto de entrada
-├── firebase.config.js       # Configuración Firebase (no incluida en el repo)
+├── firebase.config.js       # Configuración Firebase
+├── google-services.json     # Configuración Firebase para Android nativo
 ├── babel.config.js
+├── eas.json                 # Perfiles de build (preview APK / production AAB)
 ├── app.json
 └── package.json
 ```
@@ -237,4 +273,4 @@ Para consultas de licenciamiento: delgadocristian1986@gmail.com
 
 **Autor:** Cristian Delgado  
 **Email:** delgadocristian1986@gmail.com  
-**Repositorio:** github.com/delgadoc86/presufacil
+**Repositorio:** github.com/Delgadoc86/presupuestoapp
