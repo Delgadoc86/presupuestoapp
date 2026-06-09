@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "880211527939",
+    "project_id": "presupuesto-99747",
+    "storage_bucket": "presupuesto-99747.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:880211527939:android:caabb7ce0e514b1adf4136",
+        "android_client_info": {
+          "package_name": "com.delgadodev.presufacil"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjuKswsl5_b0AfJUHpitzYOfTx_QUBhCI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

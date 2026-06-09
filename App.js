@@ -1,20 +1,32 @@
+import React from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PaperProvider } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+
+import { theme } from './src/theme/theme';
+import { AppProvider } from './src/context/AppContext';
+import { AuthProvider } from './src/context/AuthContext';
+import { BusinessProvider } from './src/context/BusinessContext';
+import AppNavigator from './src/navigation/AppNavigator';
+import AppSnackbar from './src/components/common/AppSnackbar';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <PaperProvider theme={theme}>
+          <AppProvider>
+            <AuthProvider>
+              <BusinessProvider>
+                <StatusBar style="auto" />
+                <AppNavigator />
+                <AppSnackbar />
+              </BusinessProvider>
+            </AuthProvider>
+          </AppProvider>
+        </PaperProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

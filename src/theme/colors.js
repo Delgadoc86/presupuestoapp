@@ -1,0 +1,23 @@
+export const colors = {
+  primary: '#3B5BDB',
+  primaryLight: '#748FFC',
+  primaryDark: '#2F4AC4',
+  secondary: '#20C997',
+  error: '#FA5252',
+  warning: '#FD7E14',
+  success: '#40C057',
+  background: '#F8F9FA',
+  surface: '#FFFFFF',
+  surfaceVariant: '#F1F3F5',
+  text: '#212529',
+  textSecondary: '#868E96',
+  border: '#DEE2E6',
+  white: '#FFFFFF',
+  black: '#000000',
+  // Colores por estado de presupuesto
+  statusDraft: '#868E96',
+  statusSent: '#339AF0',
+  statusAccepted: '#40C057',
+  statusRejected: '#FA5252',
+  statusPaid: '#20C997',
+};
