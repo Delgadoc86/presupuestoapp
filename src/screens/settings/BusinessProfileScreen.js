@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Text, SegmentedButtons, ActivityIndicator, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ import { VALIDITY_DAYS_OPTIONS } from '../../utils/constants';
 export default function BusinessProfileScreen({ navigation }) {
   const theme = useTheme();
   const { loading: businessLoading } = useBusinessContext();
-  const { form, updateField, logoUri, pickLogo, errors, loading, save } =
+  const { form, updateField, logoUri, pickLogo, deleteLogo, errors, loading, save } =
     useBusinessForm(false);
 
   async function handleSave() {
@@ -69,29 +70,48 @@ export default function BusinessProfileScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {/* Logo */}
-          <TouchableOpacity
-            style={styles.logoArea}
-            onPress={pickLogo}
-            activeOpacity={0.75}
-          >
+          <View style={styles.logoArea}>
+            <TouchableOpacity onPress={pickLogo} activeOpacity={0.75} style={styles.logoTouchable}>
+              {logoUri ? (
+                <Image source={{ uri: logoUri }} style={styles.logoImage} />
+              ) : (
+                <View style={[styles.logoPlaceholder, { borderColor: theme.colors.primary }]}>
+                  <MaterialCommunityIcons
+                    name="camera-plus-outline"
+                    size={36}
+                    color={theme.colors.primary}
+                  />
+                </View>
+              )}
+              <Text
+                variant="labelLarge"
+                style={{ color: theme.colors.primary, marginTop: 10 }}
+              >
+                {logoUri ? 'Cambiar logo' : 'Agregar logo (opcional)'}
+              </Text>
+            </TouchableOpacity>
+
             {logoUri ? (
-              <Image source={{ uri: logoUri }} style={styles.logoImage} />
-            ) : (
-              <View style={[styles.logoPlaceholder, { borderColor: theme.colors.primary }]}>
-                <MaterialCommunityIcons
-                  name="camera-plus-outline"
-                  size={36}
-                  color={theme.colors.primary}
-                />
-              </View>
-            )}
-            <Text
-              variant="labelLarge"
-              style={{ color: theme.colors.primary, marginTop: 10 }}
-            >
-              {logoUri ? 'Cambiar logo' : 'Agregar logo (opcional)'}
-            </Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteLogoBtn}
+                onPress={() =>
+                  Alert.alert(
+                    'Eliminar logo',
+                    '¿Querés eliminar el logo del negocio? Esta acción no puede deshacerse.',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { text: 'Eliminar', style: 'destructive', onPress: deleteLogo },
+                    ]
+                  )
+                }
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={15} color={colors.error} />
+                <Text variant="labelMedium" style={styles.deleteLogoText}>
+                  Eliminar logo
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {/* Sección: Datos básicos */}
           <View style={styles.section}>
@@ -231,6 +251,23 @@ const styles = StyleSheet.create({
   logoArea: {
     alignItems: 'center',
     paddingVertical: 8,
+    gap: 12,
+  },
+  logoTouchable: {
+    alignItems: 'center',
+  },
+  deleteLogoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  deleteLogoText: {
+    color: colors.error,
   },
   logoPlaceholder: {
     width: 100,

@@ -4,7 +4,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useAppContext } from '../context/AppContext';
 import { saveBusinessProfile, completeOnboarding } from '../services/business.service';
-import { uploadLogo } from '../services/storage.service';
+import { uploadLogo, deleteLogo as deleteLogoFromStorage } from '../services/storage.service';
 import { initDefaultTemplate } from '../services/templates.service';
 
 const EMPTY_FORM = {
@@ -69,6 +69,22 @@ export function useBusinessForm(isOnboarding = false) {
     }
   }
 
+  async function deleteLogo() {
+    if (!user?.uid) return;
+    setLoading(true);
+    try {
+      await deleteLogoFromStorage(user.uid);
+      await saveBusinessProfile(user.uid, { logoUrl: null });
+      setLogoUri(null);
+      showSnackbar('Logo eliminado', 'success');
+    } catch (error) {
+      console.error('Error eliminando logo:', error);
+      showSnackbar('No se pudo eliminar el logo', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function validate() {
     const next = {};
     if (!form.businessName.trim()) next.businessName = 'Ingresá el nombre del negocio';
@@ -124,6 +140,7 @@ export function useBusinessForm(isOnboarding = false) {
     logoUri,
     setLogoUri,
     pickLogo,
+    deleteLogo,
     errors,
     loading,
     save,

@@ -26,6 +26,24 @@ export function getQuotePdfFileName(quote) {
 }
 
 /**
+ * Descarga una URL remota y la convierte a data URI base64.
+ * Devuelve null si falla (la URL no es accesible, sin internet, etc.)
+ */
+async function getLogoBase64(logoUrl) {
+  if (!logoUrl) return null;
+  try {
+    const localUri = `${FileSystem.cacheDirectory}pf_logo_tmp`;
+    await FileSystem.downloadAsync(logoUrl, localUri);
+    const base64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return `data:image/jpeg;base64,${base64}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Funcion base: genera el PDF y lo copia a documentDirectory con nombre profesional.
  * Devuelve { finalUri, fileName } para que las funciones de accion lo usen.
  */
@@ -35,7 +53,13 @@ export async function generateQuotePdfFile(quote, business) {
     ? { ...quote, business: effectiveBusiness }
     : quote;
 
-  const html = buildQuoteHTML(quoteWithBusiness);
+  // Convierte el logo a base64 para que expo-print pueda renderizarlo
+  const logoBase64 = await getLogoBase64(effectiveBusiness?.logoUrl);
+  const quoteForHtml = logoBase64
+    ? { ...quoteWithBusiness, business: { ...effectiveBusiness, logoUrl: logoBase64 } }
+    : quoteWithBusiness;
+
+  const html = buildQuoteHTML(quoteForHtml);
   const fileName = getQuotePdfFileName(quoteWithBusiness);
 
   const { uri: tempUri } = await Print.printToFileAsync({ html });

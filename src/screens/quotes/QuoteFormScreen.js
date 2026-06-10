@@ -179,8 +179,16 @@ export default function QuoteFormScreen({ navigation, route }) {
         navigation.goBack();
       } else {
         const quoteId = await createQuote(user.uid, quoteData);
+        // Reset form before navigating so pressing back shows a blank form
+        setClient(EMPTY_CLIENT);
+        setClientErrors({});
+        setItems([]);
+        setDiscount('0');
+        setDiscountType(DISCOUNT_TYPE.FIXED);
+        setAdvance('0');
+        setNotes('');
         showSnackbar('Presupuesto creado', 'success');
-        navigation.replace('QuoteDetail', { quoteId });
+        navigation.navigate('QuoteDetail', { quoteId });
       }
     } catch (error) {
       console.error('Error guardando presupuesto:', error);

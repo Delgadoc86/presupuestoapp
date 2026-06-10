@@ -5,6 +5,22 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ---
 
+## Versiones
+
+### v1.0.1 (2026-06-10)
+
+**Correcciones de bugs:**
+
+- **Formulario de presupuesto se pre-cargaba después de crear uno:** al crear un presupuesto y volver a la pestaña "Presupuesto", el formulario retenía los datos del cliente e ítems anteriores. Ahora el formulario se limpia automáticamente y está listo para un nuevo presupuesto de inmediato.
+- **Logo del negocio no aparecía en el PDF:** la URL de Firebase Storage no podía cargarse dentro del WebView de `expo-print` por restricciones de sandbox. Ahora el logo se descarga y convierte a base64 antes de generar el PDF, por lo que siempre aparece correctamente.
+- **Diseño del PDF mejorado:** nuevo layout con barra de acento superior, jerarquía tipográfica más clara, cliente con borde lateral destacado, tabla con anchos de columna explícitos y pie de página más legible.
+
+### v1.0.0 (2026-06-07)
+
+Lanzamiento inicial: registro/login con Firebase Auth, perfil del negocio con logo, creación de presupuestos con ítems/descuento/anticipo, generación de PDF con paginación JS, compartir por WhatsApp y share sheet, historial con búsqueda y filtros, plantillas de ítems, gestión de cuenta con eliminación segura (reautenticación previa).
+
+---
+
 ## Descripción
 
 PresúFácil permite a cualquier negocio o profesional independiente:

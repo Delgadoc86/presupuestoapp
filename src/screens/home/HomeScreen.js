@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, Surface, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ export default function HomeScreen({ navigation }) {
       icon: 'plus-circle-outline',
       label: 'Nuevo presupuesto',
       color: theme.colors.primary,
-      onPress: () => navigation.navigate('NewQuote'),
+      onPress: () => navigation.navigate('NewQuote', { screen: 'QuoteForm' }),
     },
     {
       icon: 'clipboard-list-outline',
@@ -52,13 +52,19 @@ export default function HomeScreen({ navigation }) {
               {business?.businessName ?? 'Tu negocio'}
             </Text>
           </View>
-          <View style={[styles.avatarCircle, { backgroundColor: theme.colors.primaryContainer }]}>
-            <MaterialCommunityIcons
-              name="account-outline"
-              size={28}
-              color={theme.colors.primary}
-            />
-          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings', { screen: 'Account' })}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={[styles.avatarCircle, { backgroundColor: theme.colors.primaryContainer }]}>
+              <MaterialCommunityIcons
+                name="account-outline"
+                size={28}
+                color={theme.colors.primary}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Acciones rápidas */}
