@@ -16,6 +16,13 @@ export async function saveBusinessProfile(userId, data) {
     { ...data, updatedAt: serverTimestamp() },
     { merge: true }
   );
+  if (data.businessName !== undefined) {
+    await setDoc(
+      doc(db, 'users', userId),
+      { businessName: data.businessName },
+      { merge: true }
+    );
+  }
 }
 
 /**
@@ -40,7 +47,7 @@ export async function completeOnboarding(userId, businessData) {
   );
   await setDoc(
     doc(db, 'users', userId),
-    { onboardingComplete: true },
+    { onboardingComplete: true, businessName: businessData.businessName ?? '' },
     { merge: true }
   );
 }

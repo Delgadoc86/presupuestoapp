@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppButton from '../../components/common/AppButton';
 import AppInput from '../../components/common/AppInput';
 import AppLoader from '../../components/common/AppLoader';
+import SectorPickerField from '../../components/common/SectorPickerField';
 import { useBusinessForm } from '../../hooks/useBusiness';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { colors } from '../../theme/colors';
@@ -127,14 +128,10 @@ export default function BusinessProfileScreen({ navigation }) {
               autoCapitalize="words"
               returnKeyType="next"
             />
-            <AppInput
-              label="Rubro / actividad *"
+            <SectorPickerField
               value={form.sector}
-              onChangeText={v => updateField('sector', v)}
+              onChange={v => updateField('sector', v)}
               error={errors.sector}
-              placeholder="Ej: Costurera, Mecánico, Electricista..."
-              autoCapitalize="sentences"
-              returnKeyType="next"
             />
           </View>
 

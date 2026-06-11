@@ -43,6 +43,8 @@ import BusinessProfileScreen from '../screens/settings/BusinessProfileScreen';
 import TemplateListScreen from '../screens/settings/TemplateListScreen';
 import TemplateFormScreen from '../screens/settings/TemplateFormScreen';
 import AccountScreen from '../screens/settings/AccountScreen';
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 
 const Tab = createBottomTabNavigator();
 const QuoteStack = createStackNavigator();
@@ -76,6 +78,8 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="TemplateList" component={TemplateListScreen} />
       <SettingsStack.Screen name="TemplateForm" component={TemplateFormScreen} />
       <SettingsStack.Screen name="Account" component={AccountScreen} />
+      <SettingsStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <SettingsStack.Screen name="AdminUsers" component={AdminUsersScreen} />
     </SettingsStack.Navigator>
   );
 }

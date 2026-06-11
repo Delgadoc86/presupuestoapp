@@ -9,6 +9,44 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
+
+function _currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function _isEffectivelyPro(userData) {
+  const isPro = userData.pro === true || userData.planType === 'pro';
+  if (!isPro) return false;
+  if (userData.proExpiresAt) {
+    const expires = userData.proExpiresAt.toDate
+      ? userData.proExpiresAt.toDate()
+      : new Date(userData.proExpiresAt);
+    if (expires < new Date()) return false;
+  }
+  return true;
+}
+
+function _checkUserLimits(userData) {
+  if (userData.enabled === false) {
+    const err = new Error('Cuenta suspendida');
+    err.code = 'account_suspended';
+    throw err;
+  }
+  if (!_isEffectivelyPro(userData)) {
+    const currentMonth = _currentYearMonth();
+    const quotesThisMonth =
+      (userData.quoteMonth ?? '') === currentMonth ? (userData.quotesThisMonth ?? 0) : 0;
+    const limit = userData.quoteLimit ?? 3;
+    if (quotesThisMonth >= limit) {
+      const err = new Error('Límite demo alcanzado');
+      err.code = 'demo_limit_reached';
+      throw err;
+    }
+    return quotesThisMonth;
+  }
+  return null;
+}
 import { db } from '../../firebase.config';
 
 /**
@@ -45,10 +83,22 @@ export async function createQuote(userId, quoteData) {
 
   await runTransaction(db, async (transaction) => {
     const userSnap = await transaction.get(userRef);
-    const lastNumber = userSnap.data()?.lastQuoteNumber ?? 0;
-    const nextNumber = lastNumber + 1;
+    const userData = userSnap.data() ?? {};
+    const quotesThisMonth = _checkUserLimits(userData);
 
-    transaction.update(userRef, { lastQuoteNumber: nextNumber });
+    const lastNumber = userData.lastQuoteNumber ?? 0;
+    const nextNumber = lastNumber + 1;
+    const currentMonth = _currentYearMonth();
+    const effectivelyPro = _isEffectivelyPro(userData);
+
+    transaction.update(userRef, {
+      lastQuoteNumber: nextNumber,
+      totalQuotes: (userData.totalQuotes ?? 0) + 1,
+      ...(effectivelyPro ? {} : {
+        quotesThisMonth: (quotesThisMonth ?? 0) + 1,
+        quoteMonth: currentMonth,
+      }),
+    });
     transaction.set(quoteRef, {
       ...quoteData,
       userId,
@@ -121,10 +171,22 @@ export async function duplicateQuote(userId, sourceQuote) {
 
   await runTransaction(db, async (transaction) => {
     const userSnap = await transaction.get(userRef);
-    const lastNumber = userSnap.data()?.lastQuoteNumber ?? 0;
-    const nextNumber = lastNumber + 1;
+    const userData = userSnap.data() ?? {};
+    const quotesThisMonth = _checkUserLimits(userData);
 
-    transaction.update(userRef, { lastQuoteNumber: nextNumber });
+    const lastNumber = userData.lastQuoteNumber ?? 0;
+    const nextNumber = lastNumber + 1;
+    const currentMonth = _currentYearMonth();
+    const effectivelyPro = _isEffectivelyPro(userData);
+
+    transaction.update(userRef, {
+      lastQuoteNumber: nextNumber,
+      totalQuotes: (userData.totalQuotes ?? 0) + 1,
+      ...(effectivelyPro ? {} : {
+        quotesThisMonth: (quotesThisMonth ?? 0) + 1,
+        quoteMonth: currentMonth,
+      }),
+    });
     transaction.set(quoteRef, {
       ...rest,
       userId,

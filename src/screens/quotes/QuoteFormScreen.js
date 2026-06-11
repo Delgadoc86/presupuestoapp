@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  Alert,
 } from 'react-native';
 import { Text, Surface, Button, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +26,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useTemplates } from '../../hooks/useTemplates';
 import { DISCOUNT_TYPE } from '../../utils/constants';
 import { colors } from '../../theme/colors';
+import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
 
 function generateItemId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -191,8 +193,28 @@ export default function QuoteFormScreen({ navigation, route }) {
         navigation.navigate('QuoteDetail', { quoteId });
       }
     } catch (error) {
-      console.error('Error guardando presupuesto:', error);
-      showSnackbar('No se pudo guardar. Revisá tu conexión.', 'error');
+      if (error.code === 'account_suspended') {
+        Alert.alert(
+          'Cuenta suspendida',
+          'Tu cuenta está suspendida. Contactá al soporte para reactivarla.',
+          [
+            { text: 'Contactar soporte', onPress: () => openSuspendedEmail(user.email) },
+            { text: 'Cancelar', style: 'cancel' },
+          ]
+        );
+      } else if (error.code === 'demo_limit_reached') {
+        Alert.alert(
+          'Límite alcanzado',
+          'Alcanzaste el límite de presupuestos del plan Demo este mes. Activá PresúFácil Pro para presupuestos ilimitados.',
+          [
+            { text: 'Activar Pro', onPress: () => openUpgradeEmail(user.email) },
+            { text: 'Cancelar', style: 'cancel' },
+          ]
+        );
+      } else {
+        console.error('Error guardando presupuesto:', error);
+        showSnackbar('No se pudo guardar. Revisá tu conexión.', 'error');
+      }
     } finally {
       setLoading(false);
     }

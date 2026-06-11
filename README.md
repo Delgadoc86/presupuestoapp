@@ -7,6 +7,37 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.2 (2026-06-10)
+
+**Sistema comercial Demo/Pro:**
+
+- **Planes Demo y Pro:** cada usuario tiene un plan asignado (`demo` o `pro`). El plan Demo limita la cantidad de presupuestos por mes (por defecto 3, configurable por admin). El plan Pro no tiene límite mensual.
+- **Cuota mensual:** el contador `quotesThisMonth` se resetea automáticamente al cambiar el mes, dentro de la transacción Firestore que crea cada presupuesto.
+- **Vencimiento de planes Pro:** los planes Pro tienen `proActivatedAt` y `proExpiresAt`. Al vencer, el usuario pasa automáticamente a comportamiento Demo sin intervención del admin.
+- **Banner de plan en Inicio:** indicador visual del estado del plan (Demo con cuota restante, Pro activo con fecha de vencimiento, Pro vencido, Cuenta suspendida). Tappable para contactar soporte o solicitar upgrade.
+- **Mensajes de error en formulario e historial:** al alcanzar el límite Demo o tener la cuenta suspendida, se muestra un Alert con opción de contactar por email.
+
+**Panel de administración:**
+
+- **Panel Admin:** accesible desde Ajustes → Panel Admin y también desde la pantalla de Inicio (solo para cuentas admin). La detección del rol admin se hace por la colección `admins/{uid}` en Firestore.
+- **Dashboard de estadísticas:** total de usuarios, Demo, Pro activos y suspendidos.
+- **Lista de usuarios:** buscador por email/negocio/ID, tarjeta por usuario con plan, fechas de vencimiento, uso mensual y total de presupuestos.
+- **Acciones por usuario:** activar Pro por 30/180/365 días (con extensión desde el vencimiento actual si ya es Pro activo), pasar a Demo, cambiar límite mensual, suspender, reactivar.
+
+**Selector de rubro en onboarding:**
+
+- Reemplaza el campo libre por un selector con 20 rubros predefinidos (mecánico, electricista, plomero, etc.) más opción "Otro" con campo de texto libre.
+
+**Reglas de seguridad Firestore:**
+
+- Los campos comerciales (`planType`, `pro`, `enabled`, `quoteLimit`) solo pueden ser escritos por admins. Los usuarios pueden actualizar únicamente los contadores (`quotesThisMonth`, `totalQuotes`, `lastQuoteNumber`) con validación increment-only.
+
+**Correcciones:**
+
+- Panel admin no aparecía después de múltiples ciclos de login/logout: se agrega `setLoading(true)` antes del `getDoc` en `useIsAdmin` y guardia `!adminLoading` en `SettingsScreen` para evitar renderizar el estado provisional.
+
+---
+
 ### v1.0.1 (2026-06-10)
 
 **Correcciones de bugs:**
@@ -46,7 +77,7 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Módulo | Descripción |
 |---|---|
 | Autenticación | Registro, inicio de sesión y recuperación de contraseña vía Firebase Auth |
-| Perfil del negocio | Nombre, rubro, logo, WhatsApp, email, dirección, CUIT, condiciones generales |
+| Perfil del negocio | Nombre, rubro (selector predefinido + libre), logo, WhatsApp, email, dirección, CUIT, condiciones generales |
 | Nuevo presupuesto | Datos del cliente, ítems con cantidad y precio unitario, descuento fijo o porcentual, anticipo, notas |
 | Historial | Listado de todos los presupuestos con búsqueda y filtros por estado |
 | Detalle de presupuesto | Vista completa, cambio de estado, edición, eliminación |
@@ -54,6 +85,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Imprimir / Guardar PDF | Abre el diálogo de impresión del sistema, que también permite guardar como PDF |
 | Plantillas | Ítems predefinidos reutilizables para agilizar la carga |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
+| Sistema Demo/Pro | Cuota mensual para Demo, planes Pro con fecha de vencimiento, banner de estado en Inicio |
+| Panel Admin | Dashboard de usuarios, gestión de planes (activar/extender Pro, cambiar límite, suspender), accesible desde Inicio y Ajustes |
 
 ---
 
@@ -145,31 +178,62 @@ eas build --platform android --profile production
 
 ## Reglas de Firestore recomendadas
 
+Las reglas protegen los campos comerciales (`planType`, `pro`, `enabled`, `quoteLimit`) para que solo puedan escribirlos los admins. Los usuarios solo pueden incrementar contadores de presupuestos.
+
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /users/{uid} {
+      allow read: if isAuth() && (isOwner(uid) || isAdmin());
+      allow create: if isAuth() && isOwner(uid);
+      allow update, delete: if isAuth() && isAdmin();
+      allow update: if isAuth() && isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['planType', 'pro', 'enabled', 'quoteLimit', 'planUpdatedAt', 'suspendedAt'])
+        && request.resource.data.get('lastQuoteNumber', 0) >= resource.data.get('lastQuoteNumber', 0)
+        && request.resource.data.get('totalQuotes', 0) >= resource.data.get('totalQuotes', 0)
+        && (
+             (request.resource.data.get('quoteMonth', '') == resource.data.get('quoteMonth', '')
+              && request.resource.data.get('quotesThisMonth', 0) >= resource.data.get('quotesThisMonth', 0))
+             ||
+             (request.resource.data.get('quoteMonth', '') != resource.data.get('quoteMonth', '')
+              && request.resource.data.get('quotesThisMonth', 0) <= 1)
+           );
     }
 
     match /businessProfiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuth() && (isOwner(userId) || isAdmin());
     }
 
     match /quotes/{quoteId} {
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null
+      allow read, update, delete: if isAuth()
+        && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuth()
         && request.auth.uid == request.resource.data.userId;
     }
 
     match /templates/{templateId} {
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null
+      allow read, update, delete: if isAuth()
+        && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuth()
         && request.auth.uid == request.resource.data.userId;
+    }
+
+    match /admins/{uid} {
+      allow read: if isAuth();
+      allow write: if false;
     }
   }
 }
@@ -235,7 +299,7 @@ presupuestoapp/
 │   │   └── templates/       # TemplateItemRow
 │   ├── context/             # AuthContext, BusinessContext, AppContext
 │   ├── data/                # defaultTemplates (plantillas predefinidas)
-│   ├── hooks/               # useBusiness, useQuotes, useTemplates
+│   ├── hooks/               # useBusiness, useQuotes, useTemplates, useIsAdmin, useAdminUsers
 │   ├── navigation/          # AppNavigator, AppTabNavigator, AuthNavigator
 │   ├── screens/             # Pantallas agrupadas por módulo
 │   │   ├── auth/            # Login, Register, ForgotPassword
@@ -243,7 +307,8 @@ presupuestoapp/
 │   │   ├── home/            # HomeScreen
 │   │   ├── onboarding/      # BusinessSetupScreen
 │   │   ├── quotes/          # QuoteDetailScreen, QuoteFormScreen
-│   │   └── settings/        # Settings, BusinessProfile, Account, Templates
+│   │   ├── settings/        # Settings, BusinessProfile, Account, Templates
+│   │   └── admin/           # AdminDashboardScreen, AdminUsersScreen
 │   ├── services/            # Lógica de Firebase y funciones de negocio
 │   │   ├── auth.service.js
 │   │   ├── business.service.js
@@ -252,7 +317,7 @@ presupuestoapp/
 │   │   ├── storage.service.js
 │   │   └── templates.service.js
 │   ├── theme/               # Colores y tema Material Design
-│   └── utils/               # Constantes, formateadores, plantilla HTML del PDF
+│   └── utils/               # Constantes (SECTOR_OPTIONS), formateadores, plantilla HTML del PDF, planStatus, contactHelper
 ├── App.js                   # Punto de entrada
 ├── firebase.config.js       # Configuración Firebase
 ├── google-services.json     # Configuración Firebase para Android nativo

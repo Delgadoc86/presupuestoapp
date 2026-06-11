@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppLoader from '../../components/common/AppLoader';
 import QuoteCard from '../../components/quotes/QuoteCard';
+import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
 import {
   deleteQuote,
   duplicateQuote,
@@ -104,8 +105,28 @@ export default function HistoryScreen({ navigation }) {
       const newId = await duplicateQuote(user.uid, q);
       showSnackbar('Presupuesto duplicado', 'success');
       navigation.navigate('QuoteDetailHistory', { quoteId: newId });
-    } catch {
-      showSnackbar('No se pudo duplicar', 'error');
+    } catch (error) {
+      if (error.code === 'account_suspended') {
+        Alert.alert(
+          'Cuenta suspendida',
+          'Tu cuenta está suspendida. Contactá al soporte para reactivarla.',
+          [
+            { text: 'Contactar soporte', onPress: () => openSuspendedEmail(user.email) },
+            { text: 'Cancelar', style: 'cancel' },
+          ]
+        );
+      } else if (error.code === 'demo_limit_reached') {
+        Alert.alert(
+          'Límite alcanzado',
+          'Alcanzaste el límite de presupuestos del plan Demo este mes. Activá PresúFácil Pro para presupuestos ilimitados.',
+          [
+            { text: 'Activar Pro', onPress: () => openUpgradeEmail(user.email) },
+            { text: 'Cancelar', style: 'cancel' },
+          ]
+        );
+      } else {
+        showSnackbar('No se pudo duplicar', 'error');
+      }
     } finally {
       setActionLoading(false);
     }

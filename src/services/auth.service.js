@@ -10,6 +10,8 @@ import {
 import {
   doc,
   setDoc,
+  getDoc,
+  updateDoc,
   deleteDoc,
   collection,
   query,
@@ -33,6 +35,28 @@ const AUTH_ERROR_MESSAGES = {
   'auth/operation-not-allowed': 'Operación no permitida',
 };
 
+function _currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+async function _normalizeUserOnLogin(uid) {
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const updates = {};
+  // Solo inicializar contadores — el usuario tiene permiso de escribirlos.
+  // Los campos de plan (planType, pro, enabled, quoteLimit) los escribe únicamente
+  // el admin; createQuote los trata con defaults (?? false, ?? 3) si no existen.
+  if (data.quotesThisMonth === undefined) updates.quotesThisMonth = 0;
+  if (data.quoteMonth === undefined) updates.quoteMonth = _currentYearMonth();
+  if (data.totalQuotes === undefined) updates.totalQuotes = 0;
+  if (Object.keys(updates).length > 0) {
+    await updateDoc(userRef, updates).catch(() => {});
+  }
+}
+
 export function getAuthErrorMessage(error) {
   return AUTH_ERROR_MESSAGES[error?.code] ?? 'Ocurrió un error. Intentá de nuevo';
 }
@@ -45,6 +69,13 @@ export async function registerWithEmail(email, password) {
       createdAt: serverTimestamp(),
       onboardingComplete: false,
       lastQuoteNumber: 0,
+      planType: 'demo',
+      pro: false,
+      enabled: true,
+      quoteLimit: 3,
+      quotesThisMonth: 0,
+      quoteMonth: _currentYearMonth(),
+      totalQuotes: 0,
     });
   } catch (firestoreError) {
     await user.delete().catch(() => {});
@@ -55,6 +86,7 @@ export async function registerWithEmail(email, password) {
 
 export async function loginWithEmail(email, password) {
   const { user } = await signInWithEmailAndPassword(auth, email, password);
+  await _normalizeUserOnLogin(user.uid).catch(() => {});
   return user;
 }
 

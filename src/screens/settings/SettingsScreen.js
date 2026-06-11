@@ -4,6 +4,7 @@ import { Text, Surface, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
+import { useIsAdmin } from '../../hooks/useIsAdmin';
 
 const SettingRow = ({ icon, label, description, onPress, iconColor }) => {
   const theme = useTheme();
@@ -30,6 +31,8 @@ const SettingRow = ({ icon, label, description, onPress, iconColor }) => {
 };
 
 export default function SettingsScreen({ navigation }) {
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -74,6 +77,23 @@ export default function SettingsScreen({ navigation }) {
             />
           </Surface>
         </View>
+
+        {!adminLoading && isAdmin && (
+          <View style={styles.section}>
+            <Text variant="labelMedium" style={styles.sectionLabel}>
+              ADMINISTRACIÓN
+            </Text>
+            <Surface style={styles.card} elevation={1}>
+              <SettingRow
+                icon="shield-account-outline"
+                label="Panel Admin"
+                description="Gestionar usuarios y planes"
+                iconColor="#E03131"
+                onPress={() => navigation.navigate('AdminDashboard')}
+              />
+            </Surface>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -5,12 +5,97 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
+import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { colors } from '../../theme/colors';
+import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
+import {
+  getPlanStatus,
+  getDaysUntilExpiry,
+  formatExpiryDate,
+} from '../../utils/planStatus';
+
+function _currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function PlanBanner({ userData, userEmail }) {
+  if (!userData) return null;
+
+  const status = getPlanStatus(userData);
+
+  if (status === 'suspended') {
+    return (
+      <TouchableOpacity
+        style={[styles.banner, styles.bannerSuspended]}
+        onPress={() => openSuspendedEmail(userEmail)}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#fff" />
+        <Text variant="bodySmall" style={styles.bannerText}>
+          Cuenta suspendida — Tocá para contactar soporte
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  if (status === 'pro_active') {
+    const expiryDate = formatExpiryDate(userData);
+    const days = getDaysUntilExpiry(userData);
+    return (
+      <View style={[styles.banner, styles.bannerPro]}>
+        <MaterialCommunityIcons name="crown" size={16} color="#2F9E44" />
+        <Text variant="bodySmall" style={styles.bannerTextPro}>
+          Plan Pro activo
+          {expiryDate ? ` · Vence el ${expiryDate}` : ''}
+          {days !== null && days <= 30 ? ` (${days} día${days !== 1 ? 's' : ''})` : ''}
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'pro_expired') {
+    const days = getDaysUntilExpiry(userData);
+    const overdue = Math.abs(days ?? 0);
+    return (
+      <TouchableOpacity
+        style={[styles.banner, styles.bannerDemo]}
+        onPress={() => openUpgradeEmail(userEmail)}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="crown-off-outline" size={16} color="#fff" />
+        <Text variant="bodySmall" style={styles.bannerText}>
+          Tu Pro venció hace {overdue} día{overdue !== 1 ? 's' : ''} — Renovar
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  // demo
+  const currentMonth = _currentYearMonth();
+  const used =
+    (userData.quoteMonth ?? '') === currentMonth ? (userData.quotesThisMonth ?? 0) : 0;
+  const limit = userData.quoteLimit ?? 3;
+  const remaining = Math.max(0, limit - used);
+  return (
+    <TouchableOpacity
+      style={[styles.banner, styles.bannerDemo]}
+      onPress={() => openUpgradeEmail(userEmail)}
+      activeOpacity={0.8}
+    >
+      <MaterialCommunityIcons name="star-outline" size={16} color="#fff" />
+      <Text variant="bodySmall" style={styles.bannerText}>
+        Plan Demo · {remaining} presupuesto{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''} este mes — Activar Pro
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function HomeScreen({ navigation }) {
   const theme = useTheme();
-  const { user } = useAuthContext();
+  const { user, userData } = useAuthContext();
   const { business } = useBusinessContext();
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
 
   const quickActions = [
     {
@@ -67,6 +152,9 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* Banner de plan */}
+        <PlanBanner userData={userData} userEmail={user?.email} />
+
         {/* Acciones rápidas */}
         <Text variant="titleMedium" style={styles.sectionTitle}>
           ¿Qué querés hacer?
@@ -89,6 +177,32 @@ export default function HomeScreen({ navigation }) {
             </Surface>
           ))}
         </View>
+
+        {!adminLoading && isAdmin && (
+          <View>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Administración
+            </Text>
+            <Surface
+              style={styles.adminCard}
+              elevation={1}
+              onTouchEnd={() => navigation.navigate('Settings', { screen: 'AdminDashboard' })}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#E0312118' }]}>
+                <MaterialCommunityIcons name="shield-account-outline" size={28} color="#E03121" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="labelLarge" style={[styles.actionLabel, { color: colors.text }]}>
+                  Panel Admin
+                </Text>
+                <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 2 }}>
+                  Gestionar usuarios y planes
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
+            </Surface>
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -150,5 +264,44 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontWeight: '600',
     lineHeight: 20,
+  },
+  adminCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0312130',
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  bannerSuspended: {
+    backgroundColor: colors.error,
+  },
+  bannerDemo: {
+    backgroundColor: colors.warning,
+  },
+  bannerPro: {
+    backgroundColor: '#EBFBEE',
+    borderWidth: 1,
+    borderColor: '#B2F2BB',
+  },
+  bannerText: {
+    color: '#fff',
+    fontWeight: '600',
+    flex: 1,
+  },
+  bannerTextPro: {
+    color: '#2F9E44',
+    fontWeight: '600',
+    flex: 1,
   },
 });

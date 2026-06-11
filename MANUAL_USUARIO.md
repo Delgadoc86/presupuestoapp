@@ -21,7 +21,8 @@
 13. [Plantillas de ítems](#13-plantillas-de-ítems)
 14. [Ajustes y perfil del negocio](#14-ajustes-y-perfil-del-negocio)
 15. [Gestión de tu cuenta](#15-gestión-de-tu-cuenta) — cerrar sesión, eliminar cuenta
-16. [Preguntas frecuentes](#16-preguntas-frecuentes)
+16. [Plan Demo y Plan Pro](#16-plan-demo-y-plan-pro)
+17. [Preguntas frecuentes](#17-preguntas-frecuentes)
 
 ---
 
@@ -83,7 +84,7 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 | Campo | Obligatorio | Descripción |
 |---|---|---|
 | Nombre del negocio | Sí | El nombre que verán tus clientes |
-| Rubro / Actividad | Sí | Por ej.: Electricidad, Diseño Gráfico, Plomería |
+| Rubro / Actividad | Sí | Seleccioná de la lista predefinida (20 rubros) o elegí "Otro" para ingresar el tuyo |
 | WhatsApp | Sí | Número de contacto principal |
 | Email | No | Email de contacto del negocio |
 | Dirección | No | Domicilio o zona de trabajo |
@@ -110,7 +111,16 @@ Luego del onboarding, llegás a la pantalla principal. Desde acá tenés acceso 
 - **Mis plantillas** — gestionar ítems predefinidos
 - **Mi negocio** — editar el perfil de tu negocio
 
-En la parte superior se muestra el nombre de tu negocio.
+En la parte superior se muestra el nombre de tu negocio y el ícono de usuario (silueta) para ir rápido a tu cuenta.
+
+**Banner de plan:** debajo del encabezado aparece una barra de color según tu situación:
+
+| Color | Significado |
+|---|---|
+| Naranja | Plan Demo — muestra cuántos presupuestos te quedan este mes. Tocalo para solicitar el Plan Pro. |
+| Verde | Plan Pro activo — muestra la fecha de vencimiento. |
+| Naranja (vencido) | Plan Pro vencido — tocalo para renovar. |
+| Rojo | Cuenta suspendida — tocalo para contactar soporte. |
 
 ---
 
@@ -351,7 +361,34 @@ Una vez confirmada, todos tus datos se eliminan de forma permanente y la sesión
 
 ---
 
-## 16. Preguntas frecuentes
+## 16. Plan Demo y Plan Pro
+
+PresúFácil tiene dos planes: **Demo** (gratuito) y **Pro** (de pago).
+
+### Plan Demo
+
+- Permite crear hasta **3 presupuestos por mes** (el límite puede variar según lo configure el administrador).
+- El contador se resetea automáticamente el primer día de cada mes.
+- Si alcanzás el límite, aparece un aviso con la opción de solicitar el Plan Pro.
+
+### Plan Pro
+
+- **Sin límite** de presupuestos mensuales.
+- Tiene una **fecha de vencimiento** (30, 180 o 365 días según lo que hayas contratado).
+- Cuando te quedan 30 días o menos, el banner verde en Inicio muestra los días restantes.
+- Al vencer, el plan pasa automáticamente a comportamiento Demo hasta que se renueve.
+
+### Cómo solicitar el Plan Pro
+
+Tocá el banner naranja en la pantalla de Inicio, o avisanos directamente por email a **delgadocristian1986@gmail.com** con el asunto *"Solicitud Plan Pro"*.
+
+### Cuenta suspendida
+
+Si tu cuenta aparece suspendida (banner rojo), contactá soporte tocando el banner o escribiendo a **delgadocristian1986@gmail.com**.
+
+---
+
+## 17. Preguntas frecuentes
 
 **¿Mis datos se guardan si desinstalo la app?**
 Sí. Todos tus presupuestos y datos de negocio se almacenan en la nube (Firebase). Al reinstalar la app e iniciar sesión, recuperás todo.
@@ -372,7 +409,16 @@ El PDF se genera desde los datos del presupuesto que están cargados en pantalla
 Podés hacerlo directamente desde la app: **Ajustes → Cuenta → Eliminar cuenta**. El proceso requiere confirmar tu contraseña por seguridad y elimina todo de forma inmediata e irreversible. Ver detalle en la sección 15.
 
 **¿La app es gratuita?**
-Sí, PresúFácil es gratuita.
+La app se puede usar gratis con el Plan Demo, que permite hasta 3 presupuestos por mes. El Plan Pro sin límites es de pago. Contactanos para más información.
+
+**¿Qué pasa si llego al límite del plan Demo?**
+La app te avisa con un Alert al intentar crear o duplicar un presupuesto. Podés contactar soporte desde ese mismo aviso para solicitar el Plan Pro.
+
+**¿Qué pasa cuando vence mi plan Pro?**
+El plan pasa automáticamente a comportamiento Demo (límite mensual). Tus presupuestos existentes no se borran. Podés renovar contactando soporte.
+
+**¿Cómo sé cuándo vence mi plan Pro?**
+En la pantalla de Inicio hay un banner verde que muestra la fecha de vencimiento. Cuando quedan 30 días o menos, también muestra los días restantes.
 
 ---
 

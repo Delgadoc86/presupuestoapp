@@ -51,3 +51,27 @@ export const UNIT_OPTIONS = [
 
 /** Opciones predefinidas de días de validez para el selector en el perfil del negocio. */
 export const VALIDITY_DAYS_OPTIONS = [7, 15, 30, 60];
+
+/** Lista de rubros/oficios precargados para el selector en el perfil del negocio. */
+export const SECTOR_OPTIONS = [
+  'Mecánico',
+  'Electricista',
+  'Plomero',
+  'Albañil',
+  'Jardinero',
+  'Pintor',
+  'Carpintero',
+  'Herrero',
+  'Técnico en refrigeración',
+  'Técnico informático',
+  'Costurero / arreglos de ropa',
+  'Peluquero / barbería',
+  'Fotógrafo',
+  'DJ / sonido',
+  'Diseñador gráfico',
+  'Community manager',
+  'Developer / desarrollo web',
+  'Limpieza',
+  'Fletes / mudanzas',
+  'Otro',
+];
