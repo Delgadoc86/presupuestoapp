@@ -7,6 +7,37 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.3 (2026-06-15)
+
+**Verificación de email obligatoria:**
+
+- Al registrarse, la app envía un email de verificación automáticamente.
+- Los usuarios no verificados ven una pantalla dedicada para verificar el email o reenviar el correo antes de poder acceder a la app.
+- Reenvío con cooldown de 60 segundos. El botón muestra la cuenta regresiva.
+- `reloadUser()` en `AuthContext` recarga el estado de verificación desde Firebase (`auth.currentUser.reload()`) y actualiza el estado React sin cerrar sesión.
+
+**Seguridad en recuperación de contraseña (OWASP A07):**
+
+- Corregida falla de enumeración de usuarios: el formulario de recuperación siempre muestra el estado de éxito independientemente de si el email está registrado o no.
+- `auth/user-not-found` se absorbe en `resetPassword()` del servicio y nunca llega a la UI.
+- Solo errores operacionales reales (sin conexión) interrumpen el flujo.
+
+**Rubro / profesión asociado permanentemente a la cuenta:**
+
+- El rubro elegido durante el onboarding queda asociado de forma permanente a la cuenta.
+- Al tocar "Guardar y comenzar" en el onboarding, se muestra un diálogo de confirmación con advertencia explícita sobre la irreversibilidad de la elección antes de guardar.
+- En la pantalla de edición del perfil del negocio, el rubro aparece como campo bloqueado con ícono de candado y fondo diferenciado. Al tocarlo se muestra un mensaje informativo que explica cómo cambiar de rubro (requiere eliminar la cuenta).
+
+**Eliminado botón "Cambiar contraseña":**
+
+- Removido de la pantalla de cuenta. La contraseña se gestiona exclusivamente mediante el email de recuperación.
+
+**Migración de proyecto Firebase:**
+
+- Base de datos migrada al proyecto `presupuesto-7d9e2`.
+
+---
+
 ### v1.0.2 (2026-06-10)
 
 **Sistema comercial Demo/Pro:**

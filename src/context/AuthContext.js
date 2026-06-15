@@ -1,24 +1,15 @@
 /**
  * AuthContext — estado de autenticación y datos del usuario.
  *
- * Responsabilidad: mantener sincronizado el estado del usuario autenticado
- * con Firebase Auth y su documento en Firestore en tiempo real.
- *
  * Expone:
- *   - user     → objeto FirebaseUser (o null si no hay sesión)
- *   - userData → datos del documento users/{uid} en Firestore (o null)
- *   - loading  → true mientras se resuelve el estado inicial de autenticación
- *
- * Patrón de doble listener:
- *   1. onAuthStateChanged escucha si el usuario inicia/cierra sesión.
- *   2. Cuando hay usuario, onSnapshot escucha cambios en users/{uid} en tiempo real.
- *      Esto permite que AppNavigator reaccione automáticamente cuando
- *      onboardingComplete cambia de false a true.
- *   3. Al cerrar sesión, el listener de Firestore se cancela para evitar
- *      lecturas innecesarias y errores de permisos.
- *
- * Consumidores: AppNavigator (decide qué stack mostrar), cualquier pantalla
- * que necesite el uid del usuario o sus datos de cuenta.
+ *   - user          → objeto FirebaseUser (o null)
+ *   - userData      → datos del documento users/{uid} en Firestore (o null)
+ *   - loading       → true mientras se resuelve el estado inicial de autenticación
+ *   - emailVerified → refleja auth.currentUser.emailVerified; se actualiza
+ *                     vía reloadUser() porque onAuthStateChanged no se dispara
+ *                     cuando emailVerified cambia server-side
+ *   - reloadUser()  → llama reload() en Firebase, actualiza emailVerified,
+ *                     retorna el nuevo valor (true/false)
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -31,12 +22,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   useEffect(() => {
     let userDocUnsubscribe = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Cancelar listener anterior si el usuario cambia (ej: cierre de sesión)
       if (userDocUnsubscribe) {
         userDocUnsubscribe();
         userDocUnsubscribe = null;
@@ -44,8 +35,7 @@ export function AuthProvider({ children }) {
 
       if (firebaseUser) {
         setUser(firebaseUser);
-        // Escucha en tiempo real el documento del usuario para detectar
-        // el cambio de onboardingComplete y otras actualizaciones de cuenta
+        setEmailVerified(firebaseUser.emailVerified);
         userDocUnsubscribe = onSnapshot(
           doc(db, 'users', firebaseUser.uid),
           (snap) => {
@@ -60,6 +50,7 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null);
         setUserData(null);
+        setEmailVerified(false);
         setLoading(false);
       }
     });
@@ -70,8 +61,16 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  async function reloadUser() {
+    if (!auth.currentUser) return false;
+    await auth.currentUser.reload();
+    const verified = auth.currentUser.emailVerified;
+    setEmailVerified(verified);
+    return verified;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, userData, loading }}>
+    <AuthContext.Provider value={{ user, userData, loading, emailVerified, reloadUser }}>
       {children}
     </AuthContext.Provider>
   );

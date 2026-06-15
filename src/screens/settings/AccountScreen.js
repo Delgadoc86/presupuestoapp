@@ -187,22 +187,6 @@ export default function AccountScreen({ navigation }) {
           <TouchableOpacity
             style={styles.row}
             activeOpacity={0.7}
-            onPress={() => showSnackbar('Disponible en próxima actualización', 'info')}
-          >
-            <View style={[styles.rowIcon, { backgroundColor: `${colors.statusSent}18` }]}>
-              <MaterialCommunityIcons name="lock-outline" size={22} color={colors.statusSent} />
-            </View>
-            <Text variant="bodyLarge" style={styles.rowLabel}>
-              Cambiar contraseña
-            </Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </Surface>
-
-        <Surface style={styles.card} elevation={1}>
-          <TouchableOpacity
-            style={styles.row}
-            activeOpacity={0.7}
             onPress={() => setLogoutDialogVisible(true)}
           >
             <View style={[styles.rowIcon, { backgroundColor: `${colors.error}18` }]}>

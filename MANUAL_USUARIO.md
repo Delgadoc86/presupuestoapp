@@ -8,21 +8,22 @@
 
 1. [¿Qué es PresúFácil?](#1-qué-es-presúfácil)
 2. [Crear una cuenta](#2-crear-una-cuenta)
-3. [Iniciar sesión](#3-iniciar-sesión)
-4. [Configurar tu negocio](#4-configurar-tu-negocio)
-5. [Pantalla de inicio](#5-pantalla-de-inicio)
-6. [Crear un presupuesto](#6-crear-un-presupuesto)
-7. [Ver el detalle de un presupuesto](#7-ver-el-detalle-de-un-presupuesto)
-8. [Cambiar el estado de un presupuesto](#8-cambiar-el-estado-de-un-presupuesto)
-9. [Compartir el presupuesto en PDF](#9-compartir-el-presupuesto-en-pdf)
-10. [Enviar por WhatsApp](#10-enviar-por-whatsapp)
-11. [Editar o eliminar un presupuesto](#11-editar-o-eliminar-un-presupuesto)
-12. [Historial de presupuestos](#12-historial-de-presupuestos)
-13. [Plantillas de ítems](#13-plantillas-de-ítems)
-14. [Ajustes y perfil del negocio](#14-ajustes-y-perfil-del-negocio)
-15. [Gestión de tu cuenta](#15-gestión-de-tu-cuenta) — cerrar sesión, eliminar cuenta
-16. [Plan Demo y Plan Pro](#16-plan-demo-y-plan-pro)
-17. [Preguntas frecuentes](#17-preguntas-frecuentes)
+3. [Verificar tu email](#3-verificar-tu-email)
+4. [Iniciar sesión](#4-iniciar-sesión)
+5. [Configurar tu negocio](#5-configurar-tu-negocio)
+6. [Pantalla de inicio](#6-pantalla-de-inicio)
+7. [Crear un presupuesto](#7-crear-un-presupuesto)
+8. [Ver el detalle de un presupuesto](#8-ver-el-detalle-de-un-presupuesto)
+9. [Cambiar el estado de un presupuesto](#9-cambiar-el-estado-de-un-presupuesto)
+10. [Compartir el presupuesto en PDF](#10-compartir-el-presupuesto-en-pdf)
+11. [Enviar por WhatsApp](#11-enviar-por-whatsapp)
+12. [Editar o eliminar un presupuesto](#12-editar-o-eliminar-un-presupuesto)
+13. [Historial de presupuestos](#13-historial-de-presupuestos)
+14. [Plantillas de ítems](#14-plantillas-de-ítems)
+15. [Ajustes y perfil del negocio](#15-ajustes-y-perfil-del-negocio)
+16. [Gestión de tu cuenta](#16-gestión-de-tu-cuenta) — cerrar sesión, eliminar cuenta
+17. [Plan Demo y Plan Pro](#17-plan-demo-y-plan-pro)
+18. [Preguntas frecuentes](#18-preguntas-frecuentes)
 
 ---
 
@@ -54,13 +55,30 @@ Al abrir la app por primera vez vas a ver la pantalla de inicio de sesión.
 3. Elegí una **contraseña** (mínimo 6 caracteres)
 4. Tocá **"Registrarme"**
 
-Tu cuenta se crea de forma segura con Firebase Authentication. Nunca compartimos tu email con nadie.
+Al registrarte, la app envía automáticamente un email de verificación a la dirección que ingresaste. Es necesario verificar el email antes de usar la app (ver sección 3).
 
 ---
 
-## 3. Iniciar sesión
+## 3. Verificar tu email
 
-Si ya tenés una cuenta:
+Después de crear tu cuenta, la app te muestra la pantalla de verificación de correo.
+
+**Pasos:**
+
+1. Abrí tu casilla de email (revisá también **Spam** o **Correo no deseado**)
+2. Buscá el mensaje de **PresúFácil** o **Firebase**
+3. Tocá el enlace de verificación que contiene el correo
+4. Volvé a la app y tocá **"Ya verifiqué mi correo"**
+
+> Si no recibiste el email, esperá unos segundos y tocá **"Reenviar email"**. El botón de reenvío tiene un tiempo de espera de 60 segundos entre intentos.
+
+> Para salir de esta pantalla sin verificar, tocá **"Cerrar sesión"**. Podés verificar el email más tarde y volver a iniciar sesión.
+
+---
+
+## 4. Iniciar sesión
+
+Si ya tenés una cuenta verificada:
 
 1. Ingresá tu **email**
 2. Ingresá tu **contraseña**
@@ -70,12 +88,13 @@ Si ya tenés una cuenta:
 
 1. Tocá **"¿Olvidaste tu contraseña?"**
 2. Ingresá tu email
-3. Tocá **"Enviar link"**
-4. Revisá tu casilla de email y seguí las instrucciones
+3. Tocá **"Enviar enlace de recuperación"**
+4. Si existe una cuenta con ese email, recibirás el enlace para crear una nueva contraseña
+5. Revisá también tu carpeta de **Spam o Correo no deseado**
 
 ---
 
-## 4. Configurar tu negocio
+## 5. Configurar tu negocio
 
 La primera vez que iniciás sesión, la app te pide que configures el perfil de tu negocio. Esta información aparecerá en todos tus presupuestos.
 
@@ -84,7 +103,7 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 | Campo | Obligatorio | Descripción |
 |---|---|---|
 | Nombre del negocio | Sí | El nombre que verán tus clientes |
-| Rubro / Actividad | Sí | Seleccioná de la lista predefinida (20 rubros) o elegí "Otro" para ingresar el tuyo |
+| Rubro / Actividad | Sí | Seleccioná de la lista predefinida (20 rubros) o elegí "Otro" para ingresar el tuyo. **Esta elección es permanente** (ver nota abajo) |
 | WhatsApp | Sí | Número de contacto principal |
 | Email | No | Email de contacto del negocio |
 | Dirección | No | Domicilio o zona de trabajo |
@@ -92,6 +111,10 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 | Condiciones generales | No | Texto que aparece al pie de cada presupuesto |
 | Logo | No | Imagen cuadrada del logo (se recorta automáticamente) |
 | Validez del presupuesto | No | Cantidad de días que es válido (por defecto: 30) |
+
+> **Importante — El rubro es una elección permanente:** el oficio o rubro que elijas quedará asociado a tu cuenta y **no podrá modificarse** más adelante. Esta elección define tus plantillas, historial y configuración inicial. Si en el futuro necesitás usar PresúFácil con otro rubro, deberás eliminar tu cuenta actual, perder toda la información guardada y crear una nueva. Elegí con cuidado.
+
+Al tocar **"Guardar y comenzar"**, la app te va a mostrar un resumen de esta advertencia y te pedirá confirmar antes de continuar.
 
 **Para subir el logo:**
 1. Tocá el ícono de cámara sobre el logo
@@ -102,7 +125,7 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 
 ---
 
-## 5. Pantalla de inicio
+## 6. Pantalla de inicio
 
 Luego del onboarding, llegás a la pantalla principal. Desde acá tenés acceso rápido a:
 
@@ -124,9 +147,11 @@ En la parte superior se muestra el nombre de tu negocio y el ícono de usuario (
 
 ---
 
-## 6. Crear un presupuesto
+## 7. Crear un presupuesto
 
 Tocá **"Nuevo presupuesto"** desde el inicio o desde el botón + de la barra inferior.
+
+
 
 ### Datos del cliente
 
@@ -150,7 +175,7 @@ Los ítems son los productos o servicios que incluís en el presupuesto.
 Podés agregar tantos ítems como necesites. Para eliminar uno, tocá el ícono de basura al costado.
 
 **¿Tenés plantillas guardadas?**
-Tocá **"Usar plantilla"** para cargar ítems predefinidos de una sola vez (ver sección 13).
+Tocá **"Usar plantilla"** para cargar ítems predefinidos de una sola vez (ver sección 14).
 
 ### Totales y descuentos
 
@@ -173,7 +198,7 @@ Tocá **"Crear presupuesto"** para guardar. La app te lleva automáticamente al 
 
 ---
 
-## 7. Ver el detalle de un presupuesto
+## 8. Ver el detalle de un presupuesto
 
 En la pantalla de detalle podés ver toda la información del presupuesto:
 
@@ -193,7 +218,7 @@ Desde esta pantalla también podés:
 
 ---
 
-## 8. Cambiar el estado de un presupuesto
+## 9. Cambiar el estado de un presupuesto
 
 Cada presupuesto puede estar en uno de estos estados:
 
@@ -213,7 +238,7 @@ Cada presupuesto puede estar en uno de estos estados:
 
 ---
 
-## 9. Compartir el presupuesto en PDF
+## 10. Compartir el presupuesto en PDF
 
 1. Abrí el detalle del presupuesto
 2. Tocá **"Compartir PDF"**
@@ -233,7 +258,7 @@ El PDF incluye:
 
 ---
 
-## 10. Enviar por WhatsApp
+## 11. Enviar por WhatsApp
 
 Esta función abre WhatsApp con un mensaje profesional ya armado que incluye:
 - El nombre del cliente
@@ -251,7 +276,7 @@ Esta función abre WhatsApp con un mensaje profesional ya armado que incluye:
 
 ---
 
-## 11. Editar o eliminar un presupuesto
+## 12. Editar o eliminar un presupuesto
 
 ### Editar
 
@@ -270,7 +295,7 @@ Esta función abre WhatsApp con un mensaje profesional ya armado que incluye:
 
 ---
 
-## 12. Historial de presupuestos
+## 13. Historial de presupuestos
 
 Tocá **"Ver historial"** desde el inicio o usá la pestaña de la barra inferior.
 
@@ -282,7 +307,7 @@ Acá vas a ver todos tus presupuestos ordenados por fecha. Podés:
 
 ---
 
-## 13. Plantillas de ítems
+## 14. Plantillas de ítems
 
 Las plantillas te permiten guardar conjuntos de ítems que usás frecuentemente para aplicarlos en un clic al crear un nuevo presupuesto.
 
@@ -311,32 +336,35 @@ Podés seguir modificando los ítems después de aplicar la plantilla.
 
 ---
 
-## 14. Ajustes y perfil del negocio
+## 15. Ajustes y perfil del negocio
 
 Desde la pestaña **"Ajustes"** podés acceder a:
 
 ### Perfil del negocio
 
-Editá cualquier dato de tu negocio: nombre, logo, rubro, contacto, CUIT, condiciones generales y validez de los presupuestos.
+Editá los datos de tu negocio: nombre, logo, contacto, CUIT, condiciones generales y validez de los presupuestos.
+
+El **rubro / actividad** aparece como campo bloqueado con un ícono de candado y no puede modificarse. Si querés saber por qué o qué hacer para cambiarlo, tocá el campo para ver las instrucciones.
 
 Los cambios se guardan automáticamente en la nube. Los presupuestos ya creados **no** se modifican cuando cambiás el perfil (cada presupuesto guarda una foto del negocio al momento de crearlo).
 
 ### Mis plantillas
 
-Gestioná tus plantillas de ítems (ver sección 13).
+Gestioná tus plantillas de ítems (ver sección 14).
 
 ---
 
-## 15. Gestión de tu cuenta
+## 16. Gestión de tu cuenta
 
 Desde **Ajustes → Cuenta** podés:
 
 - Ver el email con el que te registraste
-- Cambiar tu contraseña *(disponible próximamente)*
 - Cerrar sesión
 - Eliminar tu cuenta y todos tus datos
 
 > También podés llegar a esta pantalla tocando el ícono de usuario (silueta) en la esquina superior derecha de la pantalla de inicio.
+
+**¿Olvidaste tu contraseña?** Desde la pantalla de inicio de sesión tocá **"¿Olvidaste tu contraseña?"** y seguí las instrucciones. Recibirás un enlace por email para crear una nueva contraseña.
 
 ### Cerrar sesión
 
@@ -361,7 +389,7 @@ Una vez confirmada, todos tus datos se eliminan de forma permanente y la sesión
 
 ---
 
-## 16. Plan Demo y Plan Pro
+## 17. Plan Demo y Plan Pro
 
 PresúFácil tiene dos planes: **Demo** (gratuito) y **Pro** (de pago).
 
@@ -388,7 +416,7 @@ Si tu cuenta aparece suspendida (banner rojo), contactá soporte tocando el bann
 
 ---
 
-## 17. Preguntas frecuentes
+## 18. Preguntas frecuentes
 
 **¿Mis datos se guardan si desinstalo la app?**
 Sí. Todos tus presupuestos y datos de negocio se almacenan en la nube (Firebase). Al reinstalar la app e iniciar sesión, recuperás todo.
@@ -406,7 +434,10 @@ No. Tus presupuestos son privados y solo vos podés verlos desde tu cuenta.
 El PDF se genera desde los datos del presupuesto que están cargados en pantalla. Si el presupuesto ya está visible, se puede generar. Sin embargo, se necesita internet para compartirlo por algunas apps.
 
 **¿Cómo elimino mi cuenta y todos mis datos?**
-Podés hacerlo directamente desde la app: **Ajustes → Cuenta → Eliminar cuenta**. El proceso requiere confirmar tu contraseña por seguridad y elimina todo de forma inmediata e irreversible. Ver detalle en la sección 15.
+Podés hacerlo directamente desde la app: **Ajustes → Cuenta → Eliminar cuenta**. El proceso requiere confirmar tu contraseña por seguridad y elimina todo de forma inmediata e irreversible. Ver detalle en la sección 16.
+
+**¿Puedo cambiar el rubro de mi negocio?**
+No. El rubro que elegiste al configurar tu negocio por primera vez queda asociado permanentemente a tu cuenta. Si necesitás operar con otro rubro, deberás eliminar tu cuenta actual (perdés todos los datos: presupuestos, plantillas, historial) y crear una nueva desde cero.
 
 **¿La app es gratuita?**
 La app se puede usar gratis con el Plan Demo, que permite hasta 3 presupuestos por mes. El Plan Pro sin límites es de pago. Contactanos para más información.

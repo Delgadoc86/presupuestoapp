@@ -40,12 +40,20 @@ export default function ForgotPasswordScreen({ navigation }) {
     setLoading(true);
     try {
       await resetPassword(email.trim());
-      setSent(true);
     } catch (error) {
-      showSnackbar(getAuthErrorMessage(error), 'error');
+      // Solo mostramos error en fallas de red u operacionales.
+      // auth/user-not-found ya lo absorbe resetPassword() en el servicio.
+      // Siempre mostramos el estado de éxito para evitar enumeración de usuarios.
+      const code = error?.code;
+      if (code === 'auth/network-request-failed') {
+        setLoading(false);
+        showSnackbar('Sin conexión. Verificá tu internet.', 'error');
+        return;
+      }
     } finally {
       setLoading(false);
     }
+    setSent(true);
   }
 
   return (
@@ -83,9 +91,10 @@ export default function ForgotPasswordScreen({ navigation }) {
                 ¡Email enviado!
               </Text>
               <Text variant="bodyMedium" style={styles.successText}>
-                Revisá tu bandeja de entrada en{' '}
-                <Text style={{ fontWeight: '600', color: colors.text }}>{email}</Text>
-                {' '}y seguí las instrucciones para recuperar tu contraseña.
+                Si existe una cuenta con el email{' '}
+                <Text style={{ fontWeight: '600', color: colors.text }}>{email.trim()}</Text>
+                {', '}recibirás un enlace para crear una nueva contraseña.{'\n\n'}
+                Revisá también tu carpeta de Spam o Correo no deseado.
               </Text>
               <AppButton
                 onPress={() => navigation.navigate('Login')}

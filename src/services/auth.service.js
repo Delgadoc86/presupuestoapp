@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut,
   deleteUser,
   reauthenticateWithCredential,
@@ -23,9 +24,12 @@ import { auth, db } from '../../firebase.config';
 import { deleteLogo } from './storage.service';
 
 const AUTH_ERROR_MESSAGES = {
+  // Firebase Auth v9 modular unifica user-not-found + wrong-password en invalid-credential
+  // para evitar enumeración de usuarios. Los códigos legacy se mantienen por compatibilidad
+  // pero se mapean al mismo mensaje genérico.
   'auth/invalid-credential': 'Email o contraseña incorrectos',
-  'auth/user-not-found': 'No existe una cuenta con ese email',
-  'auth/wrong-password': 'Contraseña incorrecta',
+  'auth/user-not-found': 'Email o contraseña incorrectos',
+  'auth/wrong-password': 'Email o contraseña incorrectos',
   'auth/email-already-in-use': 'Ya existe una cuenta con ese email',
   'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
   'auth/invalid-email': 'El email ingresado no es válido',
@@ -81,7 +85,14 @@ export async function registerWithEmail(email, password) {
     await user.delete().catch(() => {});
     throw firestoreError;
   }
+  // Enviar email de verificación — no interrumpe el registro si falla
+  await sendEmailVerification(user).catch(() => {});
   return user;
+}
+
+export async function sendVerificationEmail() {
+  if (!auth.currentUser) return;
+  await sendEmailVerification(auth.currentUser);
 }
 
 export async function loginWithEmail(email, password) {
@@ -95,7 +106,15 @@ export async function logout() {
 }
 
 export async function resetPassword(email) {
-  await sendPasswordResetEmail(auth, email);
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    // auth/user-not-found se absorbe intencionalmente:
+    // revelar si un email está registrado es una falla de enumeración de usuarios (OWASP A07).
+    // El caller siempre muestra el estado de "email enviado" independientemente.
+    if (error?.code === 'auth/user-not-found') return;
+    throw error;
+  }
 }
 
 /**

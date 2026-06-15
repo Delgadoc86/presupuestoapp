@@ -16,7 +16,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppButton from '../../components/common/AppButton';
 import AppInput from '../../components/common/AppInput';
 import AppLoader from '../../components/common/AppLoader';
-import SectorPickerField from '../../components/common/SectorPickerField';
 import { useBusinessForm } from '../../hooks/useBusiness';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { colors } from '../../theme/colors';
@@ -128,11 +127,22 @@ export default function BusinessProfileScreen({ navigation }) {
               autoCapitalize="words"
               returnKeyType="next"
             />
-            <SectorPickerField
-              value={form.sector}
-              onChange={v => updateField('sector', v)}
-              error={errors.sector}
-            />
+            <TouchableOpacity
+              style={styles.lockedField}
+              activeOpacity={0.7}
+              onPress={() =>
+                Alert.alert(
+                  'Rubro bloqueado',
+                  'El oficio o rubro de esta cuenta no puede modificarse. Para usar PresúFácil con otro rubro, deberás eliminar tu cuenta actual y crear una nueva.\n\nAl eliminar la cuenta perderás de forma permanente tu historial, presupuestos, plantillas y datos guardados.\n\nEsta acción es responsabilidad exclusiva del usuario.'
+                )
+              }
+            >
+              <View style={styles.lockedFieldContent}>
+                <Text style={styles.lockedFieldLabel}>Rubro / Actividad</Text>
+                <Text style={styles.lockedFieldValue}>{form.sector || '—'}</Text>
+              </View>
+              <MaterialCommunityIcons name="lock-outline" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
 
           {/* Sección: Contacto */}
@@ -298,5 +308,28 @@ const styles = StyleSheet.create({
   },
   segmented: {
     borderRadius: 12,
+  },
+  lockedField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
+  },
+  lockedFieldContent: {
+    flex: 1,
+    gap: 3,
+  },
+  lockedFieldLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  lockedFieldValue: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
 });

@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Text, SegmentedButtons, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +25,17 @@ export default function BusinessSetupScreen() {
   const theme = useTheme();
   const { form, updateField, logoUri, pickLogo, errors, loading, save } =
     useBusinessForm(true);
+
+  function handleSave() {
+    Alert.alert(
+      'Antes de continuar',
+      'Importante: el oficio o rubro que elijas quedará asociado a tu cuenta y no podrá modificarse más adelante. Esta elección define tus plantillas, historial y configuración inicial.\n\nSi en el futuro querés cambiar de rubro, deberás eliminar tu cuenta, perder toda la información guardada y crear una nueva.\n\nLa responsabilidad de esta elección es exclusivamente del usuario.',
+      [
+        { text: 'Revisar', style: 'cancel' },
+        { text: 'Entiendo, continuar', onPress: save },
+      ]
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -43,7 +55,7 @@ export default function BusinessSetupScreen() {
               Configurá tu negocio
             </Text>
             <Text variant="bodyMedium" style={styles.subtitle}>
-              Esta información va a aparecer en todos tus presupuestos. Podés editarla cuando quieras.
+              Esta información va a aparecer en todos tus presupuestos. El rubro elegido quedará asociado permanentemente a tu cuenta.
             </Text>
           </View>
 
@@ -165,7 +177,7 @@ export default function BusinessSetupScreen() {
           </View>
 
           {/* Botón guardar */}
-          <AppButton onPress={save} loading={loading}>
+          <AppButton onPress={handleSave} loading={loading}>
             Guardar y comenzar
           </AppButton>
         </ScrollView>
