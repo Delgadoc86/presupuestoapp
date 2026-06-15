@@ -96,6 +96,10 @@ export function buildQuoteHTML(quote) {
   const todayStr = fmtDate({ seconds: Math.floor(Date.now() / 1000) });
 
   const hasLogo = !!b.logoUrl;
+  // Si hay nombre de empresa, se muestra grande y el nombre propio como subtítulo.
+  // Si no hay empresa, el nombre propio es el título principal (sin subtítulo duplicado).
+  const displayBizName = b.businessName || b.ownerName || 'Mi negocio';
+  const showOwnerLine = !!(b.ownerName && b.businessName);
 
   const logoSlot = hasLogo
     ? `<div class="logo-slot"><img src="${b.logoUrl}" alt="Logo" /></div>`
@@ -174,7 +178,8 @@ export function buildQuoteHTML(quote) {
            <div class="${hasLogo ? 'page-header' : 'page-header header-nologo'}">
              ${logoSlot}
              <div class="biz-block">
-               <div class="biz-name">${b.businessName ?? 'Mi negocio'}</div>
+               <div class="biz-name">${displayBizName}</div>
+               ${showOwnerLine ? `<div class="biz-owner">${b.ownerName}</div>` : ''}
                <div class="biz-contact">${bizLines}</div>
              </div>
            </div>
@@ -198,7 +203,7 @@ export function buildQuoteHTML(quote) {
            <div class="label-sm" style="margin-bottom:10px;">DETALLE DE ÍTEMS</div>`
         : `<div class="accent-bar"></div>
            <div class="continuation-header">
-             <span class="biz-name-sm">${b.businessName ?? 'Mi negocio'}</span>
+             <span class="biz-name-sm">${displayBizName}</span>
              <span class="continuation-label">Presupuesto ${quoteNumStr} — continuación (pág. ${pageNum} de ${totalPages})</span>
            </div>`;
 
@@ -261,7 +266,8 @@ export function buildQuoteHTML(quote) {
   .logo-slot img { max-width: 88px; max-height: 66px; object-fit: contain; display: block; }
   .biz-block { flex: 1; text-align: right; }
   .header-nologo .biz-block { text-align: left; }
-  .biz-name { font-size: 22px; font-weight: 700; color: #212529; margin-bottom: 6px; }
+  .biz-name { font-size: 22px; font-weight: 700; color: #212529; margin-bottom: 3px; }
+  .biz-owner { font-size: 13px; color: #495057; margin-bottom: 6px; }
   .biz-contact { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #495057; line-height: 1.7; }
   .biz-contact span { display: block; }
 

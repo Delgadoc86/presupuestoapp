@@ -7,6 +7,7 @@ import { useAdminUsers } from '../../hooks/useAdminUsers';
 import AppLoader from '../../components/common/AppLoader';
 import {
   activateUserProWithDuration,
+  restoreProFromSavedDays,
   setUserDemo,
   suspendUser,
   reactivateUser,
@@ -46,12 +47,14 @@ export default function AdminUsersScreen({ navigation }) {
 
   const [limitDialog, setLimitDialog] = useState(null);
   const [limitValue, setLimitValue] = useState('');
+  const [actionDialog, setActionDialog] = useState(null);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return users;
     return users.filter(u =>
       (u.email ?? '').toLowerCase().includes(term) ||
+      (u.ownerName ?? '').toLowerCase().includes(term) ||
       (u.businessName ?? '').toLowerCase().includes(term) ||
       (u.id ?? '').toLowerCase().includes(term)
     );
@@ -79,6 +82,193 @@ export default function AdminUsersScreen({ navigation }) {
     const uid = limitDialog.uid;
     setLimitDialog(null);
     await runAction(() => updateUserQuoteLimit(uid, n));
+  }
+
+  function getDemoDowngradeRemainingDays(user) {
+    const now = new Date();
+    const isPro = user.pro === true || user.planType === 'pro';
+    if (!isPro || !user.proExpiresAt) return 0;
+    const expiresAt = user.proExpiresAt.toDate
+      ? user.proExpiresAt.toDate()
+      : new Date(user.proExpiresAt);
+    if (expiresAt <= now) return 0;
+    return Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+  }
+
+  function previewExpiryForRestore(user) {
+    const remaining = user.proRemainingDays ?? 0;
+    const d = new Date();
+    d.setTime(d.getTime() + remaining * 24 * 60 * 60 * 1000);
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function previewExpiryForNewPeriod(user, days) {
+    const now = new Date();
+    const isPro = user.pro === true || user.planType === 'pro';
+    let base = now;
+    if (isPro && user.proExpiresAt) {
+      const exp = user.proExpiresAt.toDate
+        ? user.proExpiresAt.toDate()
+        : new Date(user.proExpiresAt);
+      if (exp > now) base = exp;
+    }
+    const d = new Date(base);
+    d.setDate(d.getDate() + days);
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function handleProPress(user, days) {
+    const savedDays = user.proRemainingDays ?? 0;
+    if (savedDays > 0) {
+      setActionDialog({ type: 'activate_restore_or_new', user });
+    } else {
+      setActionDialog({ type: 'activate_confirm', user, days });
+    }
+  }
+
+  function handleDemoPress(user) {
+    const remainingDays = getDemoDowngradeRemainingDays(user);
+    setActionDialog({ type: 'downgrade_confirm', user, remainingDays });
+  }
+
+  function handleReactivatePress(user) {
+    setActionDialog({ type: 'reactivate_confirm', user });
+  }
+
+  function renderActionDialog() {
+    if (!actionDialog) return null;
+    const { type, user, days, remainingDays } = actionDialog;
+
+    if (type === 'activate_restore_or_new') {
+      const savedDays = user.proRemainingDays ?? 0;
+      const restoreDate = previewExpiryForRestore(user);
+      return (
+        <Dialog visible onDismiss={() => setActionDialog(null)} style={styles.dialog}>
+          <Dialog.Title>Activar Pro</Dialog.Title>
+          <Dialog.Content style={{ gap: 8 }}>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>{user.email}</Text>
+            <Text variant="bodySmall" style={{ color: colors.warning, fontWeight: '700', marginTop: 4 }}>
+              Este usuario tiene {savedDays} días Pro guardados.
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginBottom: 4 }}>
+              Elegí cómo activar:
+            </Text>
+            <TouchableOpacity
+              style={[styles.dialogOption, { borderColor: colors.warning }]}
+              onPress={() => { setActionDialog(null); runAction(() => restoreProFromSavedDays(user.id)); }}
+            >
+              <Text style={[styles.dialogOptionTitle, { color: colors.warning }]}>
+                Restaurar {savedDays} días
+              </Text>
+              <Text style={styles.dialogOptionSubtitle}>Vence el {restoreDate}</Text>
+            </TouchableOpacity>
+            {PRO_DURATIONS.map(({ label, days: d }) => (
+              <TouchableOpacity
+                key={d}
+                style={styles.dialogOption}
+                onPress={() => { setActionDialog(null); runAction(() => activateUserProWithDuration(user.id, d)); }}
+              >
+                <Text style={styles.dialogOptionTitle}>Nuevo período: {label}</Text>
+                <Text style={styles.dialogOptionSubtitle}>Vence el {previewExpiryForNewPeriod(user, d)}</Text>
+              </TouchableOpacity>
+            ))}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
+          </Dialog.Actions>
+        </Dialog>
+      );
+    }
+
+    if (type === 'activate_confirm') {
+      const isExtension = getPlanStatus(user) === 'pro_active';
+      const expiry = previewExpiryForNewPeriod(user, days);
+      const durationLabel = PRO_DURATIONS.find(p => p.days === days)?.label ?? `${days} días`;
+      return (
+        <Dialog visible onDismiss={() => setActionDialog(null)} style={styles.dialog}>
+          <Dialog.Title>{isExtension ? 'Extender Pro' : 'Activar Pro'}</Dialog.Title>
+          <Dialog.Content style={{ gap: 4 }}>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>{user.email}</Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 6 }}>
+              {isExtension ? 'Extensión desde vencimiento actual:' : 'Nueva activación:'} {durationLabel}
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Vence el: {expiry}
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
+            <Button
+              mode="contained"
+              buttonColor='#2F9E44'
+              onPress={() => { setActionDialog(null); runAction(() => activateUserProWithDuration(user.id, days)); }}
+            >
+              {isExtension ? 'Extender' : 'Activar'}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      );
+    }
+
+    if (type === 'downgrade_confirm') {
+      return (
+        <Dialog visible onDismiss={() => setActionDialog(null)} style={styles.dialog}>
+          <Dialog.Title>Pasar a Demo</Dialog.Title>
+          <Dialog.Content style={{ gap: 4 }}>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>{user.email}</Text>
+            {remainingDays > 0 ? (
+              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 6 }}>
+                {'Este usuario tiene '}
+                <Text style={{ fontWeight: '700', color: colors.warning }}>
+                  {remainingDays} días Pro restantes
+                </Text>
+                {'. Quedarán guardados para poder restaurarlos.'}
+              </Text>
+            ) : (
+              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 6 }}>
+                El usuario pasará al plan Demo.
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
+            <Button
+              mode="contained"
+              buttonColor={colors.warning}
+              onPress={() => { setActionDialog(null); runAction(() => setUserDemo(user.id)); }}
+            >
+              Pasar a Demo
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      );
+    }
+
+    if (type === 'reactivate_confirm') {
+      return (
+        <Dialog visible onDismiss={() => setActionDialog(null)} style={styles.dialog}>
+          <Dialog.Title>Reactivar cuenta</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>{user.email}</Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 6 }}>
+              La cuenta quedará activa con el plan actual.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
+            <Button
+              mode="contained"
+              buttonColor='#2F9E44'
+              onPress={() => { setActionDialog(null); runAction(() => reactivateUser(user.id)); }}
+            >
+              Reactivar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      );
+    }
+
+    return null;
   }
 
   function renderUser({ item: u }) {
@@ -114,8 +304,13 @@ export default function AdminUsersScreen({ navigation }) {
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text variant="bodyLarge" style={styles.businessName} numberOfLines={1}>
-              {u.businessName || 'Sin nombre de negocio'}
+              {u.businessName || u.ownerName || 'Sin nombre'}
             </Text>
+            {u.ownerName && u.businessName ? (
+              <Text variant="bodySmall" style={styles.ownerName} numberOfLines={1}>
+                {u.ownerName}
+              </Text>
+            ) : null}
             <Text variant="bodySmall" style={styles.email} numberOfLines={1}>
               {u.email}
             </Text>
@@ -145,6 +340,16 @@ export default function AdminUsersScreen({ navigation }) {
             <MaterialCommunityIcons name="clock-alert-outline" size={14} color={colors.error} />
             <Text variant="bodySmall" style={styles.expiryExpired}>
               Venció el {expiryDate} · Hace {Math.abs(days)} día{Math.abs(days) !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
+
+        {/* Días Pro guardados (visible solo en Demo cuando hay días pendientes) */}
+        {isDemo && (u.proRemainingDays ?? 0) > 0 && (
+          <View style={styles.savedDaysRow}>
+            <MaterialCommunityIcons name="clock-check-outline" size={14} color={colors.warning} />
+            <Text variant="bodySmall" style={styles.savedDaysText}>
+              {u.proRemainingDays} días Pro guardados
             </Text>
           </View>
         )}
@@ -195,7 +400,7 @@ export default function AdminUsersScreen({ navigation }) {
                   <TouchableOpacity
                     key={d}
                     style={[styles.actionBtn, styles.btnPro]}
-                    onPress={() => runAction(() => activateUserProWithDuration(u.id, d))}
+                    onPress={() => handleProPress(u, d)}
                   >
                     <Text style={styles.actionBtnText}>{label}</Text>
                   </TouchableOpacity>
@@ -208,7 +413,7 @@ export default function AdminUsersScreen({ navigation }) {
           {isProActive && !isSuspended && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.warning }]}
-              onPress={() => runAction(() => setUserDemo(u.id))}
+              onPress={() => handleDemoPress(u)}
             >
               <Text style={styles.actionBtnText}>Pasar a Demo</Text>
             </TouchableOpacity>
@@ -251,7 +456,7 @@ export default function AdminUsersScreen({ navigation }) {
           {isSuspended && (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#2F9E44' }]}
-              onPress={() => runAction(() => reactivateUser(u.id))}
+              onPress={() => handleReactivatePress(u)}
             >
               <Text style={styles.actionBtnText}>Reactivar</Text>
             </TouchableOpacity>
@@ -313,6 +518,7 @@ export default function AdminUsersScreen({ navigation }) {
       />
 
       <Portal>
+        {renderActionDialog()}
         <Dialog
           visible={!!limitDialog}
           onDismiss={() => setLimitDialog(null)}
@@ -364,7 +570,8 @@ const styles = StyleSheet.create({
   userCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, gap: 10 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   businessName: { fontWeight: '700', color: colors.text },
-  email: { color: colors.textSecondary, marginTop: 2 },
+  ownerName: { color: colors.text, fontWeight: '500', marginTop: 2 },
+  email: { color: colors.textSecondary, marginTop: 1 },
   planBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' },
   planBadgeText: { color: '#fff', fontWeight: '700', fontSize: 10 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -393,4 +600,16 @@ const styles = StyleSheet.create({
   btnPro: { backgroundColor: '#2F9E44' },
   actionBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   dialog: { borderRadius: 20 },
+  savedDaysRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  savedDaysText: { color: colors.warning, fontWeight: '600' },
+  dialogOption: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 2,
+  },
+  dialogOptionTitle: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  dialogOptionSubtitle: { color: colors.textSecondary, fontSize: 12 },
 });

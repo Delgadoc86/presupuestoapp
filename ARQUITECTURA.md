@@ -63,14 +63,38 @@ Documento por usuario. ID = Firebase Auth UID.
 
 ```
 users/{uid}
-├── email             string    "usuario@email.com"
-├── createdAt         Timestamp fecha de registro
-├── onboardingComplete boolean  false → true al completar el setup del negocio
-└── lastQuoteNumber   number    contador para numeración correlativa (0, 1, 2, ...)
+├── email              string     "usuario@email.com"
+├── createdAt          Timestamp  fecha de registro
+├── onboardingComplete boolean    false → true al completar el setup del negocio
+├── lastQuoteNumber    number     contador para numeración correlativa (0, 1, 2, ...)
+│
+│   — campos denormalizados desde businessProfiles (para lectura rápida en admin) —
+├── businessName       string     nombre del negocio (puede estar vacío)
+├── ownerName          string     nombre del responsable / titular
+│
+│   — plan comercial (solo modificables por admin) —
+├── planType           string     "demo" | "pro"
+├── pro                boolean    alias de planType (compatibilidad legacy)
+├── enabled            boolean    false = cuenta suspendida
+├── quoteLimit         number     límite mensual en plan Demo (por defecto 3)
+├── proActivatedAt     Timestamp  fecha de la primera activación Pro (nunca se sobreescribe)
+├── proExpiresAt       Timestamp  vencimiento del período Pro activo (null si no aplica)
+├── proRemainingDays   number     días Pro guardados al hacer downgrade Demo (null si no hay)
+├── planUpdatedAt      Timestamp  última vez que el admin cambió el plan
+├── suspendedAt        Timestamp  cuándo fue suspendida la cuenta (null si activa)
+│
+│   — contadores de uso (modificables por el usuario vía transacción) —
+├── quotesThisMonth    number     presupuestos creados en el mes corriente
+├── quoteMonth         string     mes del contador "YYYY-MM"
+└── totalQuotes        number     total histórico de presupuestos
 ```
 
 **Nota:** `lastQuoteNumber` se incrementa mediante una transacción atómica en
 `createQuote()` y `duplicateQuote()` para garantizar unicidad incluso con acceso concurrente.
+
+**Nota sobre `proRemainingDays`:** se calcula y guarda al momento del downgrade Pro→Demo.
+Al reactivar Pro, el admin elige explícitamente entre restaurar esos días o iniciar un período nuevo.
+`proExpiresAt` se limpia a `null` en el downgrade para evitar datos stale.
 
 ---
 
@@ -80,7 +104,8 @@ Perfil del negocio. ID = Firebase Auth UID (mismo que users).
 
 ```
 businessProfiles/{uid}
-├── businessName       string    "Electricidad Gómez"
+├── ownerName          string    "Juan Pérez"  (obligatorio)
+├── businessName       string    "Electricidad Gómez"  (opcional — freelancers pueden omitirlo)
 ├── sector             string    "Electricidad"
 ├── whatsapp           string    "5491155554444"
 ├── email              string    "negocio@email.com"  (opcional)
@@ -113,12 +138,13 @@ quotes/{quoteId}
 │   └── email  string|null
 │
 ├── business               snapshot del negocio al momento de crear (inmutable)
+│   ├── ownerName     string
 │   ├── businessName  string
 │   ├── whatsapp      string
 │   ├── email         string
 │   ├── address       string
 │   ├── cuit          string|null
-│   ├── logoUrl       string|null
+│   ├── logoUrl       string|null  (convertido a base64 al generar el PDF)
 │   └── generalConditions string
 │
 ├── items        Array
@@ -154,6 +180,19 @@ templates/{templateId}
 ├── createdAt  Timestamp
 └── updatedAt  Timestamp
 ```
+
+---
+
+### Colección: `admins`
+
+Un documento vacío por cada administrador. ID = Firebase Auth UID.
+
+```
+admins/{uid}   ← solo su existencia indica que el usuario es admin
+```
+
+Las reglas de Firestore permiten leer `admins/{uid}` a cualquier usuario autenticado
+(para que el hook `useIsAdmin` funcione en el cliente) pero la escritura está bloqueada (`allow write: if false`).
 
 ---
 
@@ -221,6 +260,31 @@ Esto evita el error "No document to update" para usuarios nuevos.
 El objeto `business` dentro de cada presupuesto es una copia plana de los datos
 del negocio al momento de crear. Esto garantiza que editar el perfil del negocio
 no modifica presupuestos ya emitidos.
+
+### Sistema de planes Demo/Pro
+
+El estado efectivo del plan se calcula en `utils/planStatus.js` (`getPlanStatus(userData)`) y nunca se almacena como campo explícito. Los posibles estados son:
+
+| Estado | Condición |
+|---|---|
+| `suspended` | `enabled === false` |
+| `pro_active` | `planType === 'pro'` y `proExpiresAt` no venció (o es null) |
+| `pro_expired` | `planType === 'pro'` y `proExpiresAt < ahora` |
+| `demo` | cualquier otro caso |
+
+**Cambio de planes — reglas de seguridad:**
+- Los campos de plan (`planType`, `pro`, `enabled`, `quoteLimit`, `proExpiresAt`, etc.) solo pueden ser escritos por admins según las reglas de Firestore.
+- Los usuarios solo pueden incrementar sus propios contadores (`quotesThisMonth`, `totalQuotes`, `lastQuoteNumber`).
+
+**Flujo de downgrade Pro → Demo:**
+1. `setUserDemo()` lee `proExpiresAt` y calcula los días restantes.
+2. Guarda `proRemainingDays = días restantes` (o `null` si ya venció).
+3. Limpia `proExpiresAt = null` para evitar datos stale.
+
+**Flujo de activación/restauración Pro:**
+- `activateUserProWithDuration(uid, days)`: período nuevo. Si el usuario ya tiene Pro activo, extiende desde `proExpiresAt`. Limpia `proRemainingDays`.
+- `restoreProFromSavedDays(uid)`: usa exactamente `proRemainingDays` guardados. Limpia `proRemainingDays` al terminar.
+- `proActivatedAt` solo se escribe en la primera activación y nunca se sobreescribe.
 
 ### uploadBytes en lugar de uploadString+base64
 `FileSystem.EncodingType` es `undefined` en la New Architecture (Expo SDK 54+).

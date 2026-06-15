@@ -8,6 +8,7 @@ import { uploadLogo, deleteLogo as deleteLogoFromStorage } from '../services/sto
 import { initDefaultTemplate } from '../services/templates.service';
 
 const EMPTY_FORM = {
+  ownerName: '',
   businessName: '',
   sector: '',
   whatsapp: '',
@@ -33,6 +34,7 @@ export function useBusinessForm(isOnboarding = false) {
   useEffect(() => {
     if (!isOnboarding && business && !initialized.current) {
       setForm({
+        ownerName: business.ownerName ?? '',
         businessName: business.businessName ?? '',
         sector: business.sector ?? '',
         whatsapp: business.whatsapp ?? '',
@@ -87,7 +89,7 @@ export function useBusinessForm(isOnboarding = false) {
 
   function validate() {
     const next = {};
-    if (!form.businessName.trim()) next.businessName = 'Ingresá el nombre del negocio';
+    if (!form.ownerName.trim()) next.ownerName = 'Ingresá tu nombre completo';
     if (!form.sector.trim()) next.sector = 'Ingresá el rubro o actividad';
     if (!form.whatsapp.trim()) next.whatsapp = 'Ingresá tu número de WhatsApp';
     setErrors(next);

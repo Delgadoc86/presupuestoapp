@@ -7,6 +7,31 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.4 (2026-06-15)
+
+**Campo nombre del responsable (`ownerName`):**
+
+- El onboarding y la edición de perfil ahora piden el nombre completo del responsable o titular (campo obligatorio).
+- El nombre del negocio (`businessName`) pasa a ser **opcional**: autónomos, albañiles, electricistas y otros trabajadores independientes sin marca pueden operar solo con su nombre personal.
+- Si no hay nombre de negocio, el nombre del responsable se usa como título principal en el PDF y en el panel admin.
+- Si hay nombre de negocio, el nombre del responsable aparece como subtítulo debajo en el PDF.
+- El panel admin muestra el nombre del responsable debajo del nombre de negocio y lo incluye en el buscador: buscando "Marcela Rosales" se encuentra aunque el negocio se llame "Verdulería Merce".
+- El campo `ownerName` se denormaliza a `users/{uid}` (igual que `businessName`) para que el panel admin lo lea sin queries adicionales.
+
+**Mejoras en el panel admin — cambio de planes Demo/Pro:**
+
+- Confirmación obligatoria antes de cualquier cambio de plan: activar Pro, extender Pro, pasar a Demo y reactivar suspendidos.
+- Nuevo campo `proRemainingDays` en Firestore: al bajar un usuario de Pro a Demo se guardan los días restantes del período activo.
+- Al volver a activar Pro a un usuario con días guardados, el admin elige explícitamente entre restaurar exactamente los días guardados o iniciar un período nuevo (30/180/365 días). El sistema nunca asigna días automáticamente.
+- `proExpiresAt` se limpia al bajar a Demo, eliminando datos stale en Firestore.
+- `proActivatedAt` ya no se sobreescribe en cada activación: conserva la fecha de primera activación del usuario.
+- Eliminada función `activateUserPro()` sin duración (legacy). Todos los cambios de plan pasan por `activateUserProWithDuration()` o `restoreProFromSavedDays()`.
+- Nueva función `restoreProFromSavedDays()` en `admin.service.js`.
+- Los diálogos de confirmación muestran la fecha exacta de vencimiento resultante antes de confirmar.
+- Badge visual "X días Pro guardados" en la tarjeta del usuario cuando está en Demo con días pendientes de restaurar.
+
+---
+
 ### v1.0.3 (2026-06-15)
 
 **Verificación de email obligatoria:**
@@ -108,7 +133,7 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Módulo | Descripción |
 |---|---|
 | Autenticación | Registro, inicio de sesión y recuperación de contraseña vía Firebase Auth |
-| Perfil del negocio | Nombre, rubro (selector predefinido + libre), logo, WhatsApp, email, dirección, CUIT, condiciones generales |
+| Perfil del negocio | Nombre del responsable (obligatorio), nombre del negocio (opcional), rubro, logo, WhatsApp, email, dirección, CUIT, condiciones generales |
 | Nuevo presupuesto | Datos del cliente, ítems con cantidad y precio unitario, descuento fijo o porcentual, anticipo, notas |
 | Historial | Listado de todos los presupuestos con búsqueda y filtros por estado |
 | Detalle de presupuesto | Vista completa, cambio de estado, edición, eliminación |
@@ -117,7 +142,7 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Plantillas | Ítems predefinidos reutilizables para agilizar la carga |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
 | Sistema Demo/Pro | Cuota mensual para Demo, planes Pro con fecha de vencimiento, banner de estado en Inicio |
-| Panel Admin | Dashboard de usuarios, gestión de planes (activar/extender Pro, cambiar límite, suspender), accesible desde Inicio y Ajustes |
+| Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio, accesible desde Inicio y Ajustes |
 
 ---
 

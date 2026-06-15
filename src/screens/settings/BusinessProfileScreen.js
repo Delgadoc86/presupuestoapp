@@ -120,7 +120,15 @@ export default function BusinessProfileScreen({ navigation }) {
             </Text>
 
             <AppInput
-              label="Nombre del negocio *"
+              label="Nombre completo *"
+              value={form.ownerName}
+              onChangeText={v => updateField('ownerName', v)}
+              error={errors.ownerName}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
+            <AppInput
+              label="Nombre del negocio (opcional)"
               value={form.businessName}
               onChangeText={v => updateField('businessName', v)}
               error={errors.businessName}
