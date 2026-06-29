@@ -7,12 +7,15 @@ import { formatCurrency, formatDate, formatQuoteNumber } from '../../utils/forma
 import { colors } from '../../theme/colors';
 
 export default function QuoteCard({ quote, onPress, onOptions }) {
+  const clientName = quote.client?.name ?? 'Sin cliente';
+  const clientPhone = quote.client?.phone;
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
       <Surface style={styles.card} elevation={1}>
-        {/* Fila superior: número + estado + opciones */}
+        {/* Fila superior: número + badge + opciones */}
         <View style={styles.topRow}>
-          <Text variant="labelLarge" style={styles.number}>
+          <Text variant="labelMedium" style={styles.number}>
             {formatQuoteNumber(quote.quoteNumber)}
           </Text>
           <View style={styles.topRight}>
@@ -35,14 +38,21 @@ export default function QuoteCard({ quote, onPress, onOptions }) {
 
         {/* Nombre del cliente */}
         <Text variant="titleSmall" style={styles.clientName} numberOfLines={1}>
-          {quote.client?.name ?? 'Sin cliente'}
+          {clientName}
         </Text>
 
-        {/* Fila inferior: fecha + total */}
+        {/* Fila inferior: fecha (+ teléfono si existe) + total */}
         <View style={styles.bottomRow}>
-          <Text variant="bodySmall" style={styles.date}>
-            {formatDate(quote.createdAt)}
-          </Text>
+          <View style={styles.metaLeft}>
+            <Text variant="bodySmall" style={styles.date}>
+              {formatDate(quote.createdAt)}
+            </Text>
+            {!!clientPhone && (
+              <Text variant="bodySmall" style={styles.phone} numberOfLines={1}>
+                · {clientPhone}
+              </Text>
+            )}
+          </View>
           <Text variant="titleSmall" style={styles.total}>
             {formatCurrency(quote.total ?? 0)}
           </Text>
@@ -55,9 +65,9 @@ export default function QuoteCard({ quote, onPress, onOptions }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
   },
   topRow: {
     flexDirection: 'row',
@@ -71,10 +81,12 @@ const styles = StyleSheet.create({
   },
   optionsBtn: {
     padding: 2,
+    marginLeft: 2,
   },
   number: {
     color: colors.textSecondary,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   clientName: {
     fontWeight: '600',
@@ -85,8 +97,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    marginRight: 8,
+  },
   date: {
     color: colors.textSecondary,
+  },
+  phone: {
+    color: colors.textSecondary,
+    flexShrink: 1,
   },
   total: {
     fontWeight: '700',

@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../../firebase.config';
 import { deleteLogo } from './storage.service';
+import { getCurrentYearMonth } from '../utils/dateUtils';
 
 const AUTH_ERROR_MESSAGES = {
   // Firebase Auth v9 modular unifica user-not-found + wrong-password en invalid-credential
@@ -39,11 +40,6 @@ const AUTH_ERROR_MESSAGES = {
   'auth/operation-not-allowed': 'Operación no permitida',
 };
 
-function _currentYearMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
 async function _normalizeUserOnLogin(uid) {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
@@ -54,7 +50,7 @@ async function _normalizeUserOnLogin(uid) {
   // Los campos de plan (planType, pro, enabled, quoteLimit) los escribe únicamente
   // el admin; createQuote los trata con defaults (?? false, ?? 3) si no existen.
   if (data.quotesThisMonth === undefined) updates.quotesThisMonth = 0;
-  if (data.quoteMonth === undefined) updates.quoteMonth = _currentYearMonth();
+  if (data.quoteMonth === undefined) updates.quoteMonth = getCurrentYearMonth();
   if (data.totalQuotes === undefined) updates.totalQuotes = 0;
   if (Object.keys(updates).length > 0) {
     await updateDoc(userRef, updates).catch(() => {});
@@ -78,7 +74,7 @@ export async function registerWithEmail(email, password) {
       enabled: true,
       quoteLimit: 3,
       quotesThisMonth: 0,
-      quoteMonth: _currentYearMonth(),
+      quoteMonth: getCurrentYearMonth(),
       totalQuotes: 0,
     });
   } catch (firestoreError) {

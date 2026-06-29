@@ -1,7 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  Platform,
+} from 'react-native';
 import { Text, Surface, Dialog, Portal, Button, TextInput } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAdminUsers } from '../../hooks/useAdminUsers';
 import AppLoader from '../../components/common/AppLoader';
@@ -13,38 +20,66 @@ import {
   reactivateUser,
   updateUserQuoteLimit,
 } from '../../services/admin.service';
-import {
-  getPlanStatus,
-  getDaysUntilExpiry,
-  formatExpiryDate,
-} from '../../utils/planStatus';
+import { getPlanStatus } from '../../utils/planStatus';
+import { formatDateAR, addDays, formatRelativeTime } from '../../utils/dateUtils';
+import { APP_CONFIG } from '../../config/appConfig';
 import { colors } from '../../theme/colors';
 
-function formatDate(ts) {
-  if (!ts) return null;
-  try {
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch {
-    return null;
-  }
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function shortUid(uid) {
   return uid ? uid.slice(0, 8) : '—';
 }
 
 const PRO_DURATIONS = [
-  { label: '30 días', days: 30 },
-  { label: '180 días', days: 180 },
-  { label: '365 días', days: 365 },
+  { label: '30 días',  days: APP_CONFIG.proDurations.monthly },
+  { label: '180 días', days: APP_CONFIG.proDurations.halfYear },
+  { label: '365 días', days: APP_CONFIG.proDurations.yearly },
 ];
+
+// ── Badge de plan ─────────────────────────────────────────────────────────────
+
+function PlanBadge({ isSuspended, isProActive, isProExpired }) {
+  if (isSuspended) {
+    return (
+      <View style={[styles.planBadge, styles.badgeSuspended]}>
+        <MaterialCommunityIcons name="alert-circle" size={13} color="#fff" />
+        <Text style={styles.planBadgeText}>SUSPENDIDO</Text>
+      </View>
+    );
+  }
+  if (isProActive) {
+    return (
+      <View style={[styles.planBadge, styles.badgePro]}>
+        <MaterialCommunityIcons name="crown" size={13} color="#fff" />
+        <Text style={styles.planBadgeText}>PRO</Text>
+      </View>
+    );
+  }
+  if (isProExpired) {
+    return (
+      <View style={[styles.planBadge, styles.badgeExpired]}>
+        <MaterialCommunityIcons name="crown-off-outline" size={13} color="#fff" />
+        <Text style={styles.planBadgeText}>VENCIDO</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.planBadge, styles.badgeDemo]}>
+      <MaterialCommunityIcons name="star-outline" size={13} color="#fff" />
+      <Text style={styles.planBadgeText}>DEMO</Text>
+    </View>
+  );
+}
+
+// ── Pantalla principal ────────────────────────────────────────────────────────
 
 export default function AdminUsersScreen({ navigation }) {
   const { users, loading } = useAdminUsers();
+  const insets = useSafeAreaInsets();
+
   const [actionLoading, setActionLoading] = useState(false);
   const [search, setSearch] = useState('');
-
   const [limitDialog, setLimitDialog] = useState(null);
   const [limitValue, setLimitValue] = useState('');
   const [actionDialog, setActionDialog] = useState(null);
@@ -53,12 +88,14 @@ export default function AdminUsersScreen({ navigation }) {
     const term = search.trim().toLowerCase();
     if (!term) return users;
     return users.filter(u =>
-      (u.email ?? '').toLowerCase().includes(term) ||
-      (u.ownerName ?? '').toLowerCase().includes(term) ||
+      (u.email       ?? '').toLowerCase().includes(term) ||
+      (u.ownerName   ?? '').toLowerCase().includes(term) ||
       (u.businessName ?? '').toLowerCase().includes(term) ||
-      (u.id ?? '').toLowerCase().includes(term)
+      (u.id          ?? '').toLowerCase().includes(term)
     );
   }, [users, search]);
+
+  // ── Acciones ────────────────────────────────────────────────────────────────
 
   async function runAction(fn) {
     setActionLoading(true);
@@ -72,7 +109,7 @@ export default function AdminUsersScreen({ navigation }) {
   }
 
   function openLimitDialog(u) {
-    setLimitValue(String(u.quoteLimit ?? 3));
+    setLimitValue(String(u.quoteLimit ?? APP_CONFIG.demoQuoteLimit));
     setLimitDialog({ uid: u.id });
   }
 
@@ -85,36 +122,21 @@ export default function AdminUsersScreen({ navigation }) {
   }
 
   function getDemoDowngradeRemainingDays(user) {
-    const now = new Date();
-    const isPro = user.pro === true || user.planType === 'pro';
-    if (!isPro || !user.proExpiresAt) return 0;
-    const expiresAt = user.proExpiresAt.toDate
-      ? user.proExpiresAt.toDate()
-      : new Date(user.proExpiresAt);
-    if (expiresAt <= now) return 0;
-    return Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+    const { isProActive, remainingDays } = getPlanStatus(user);
+    if (!isProActive) return 0;
+    return Math.max(0, remainingDays ?? 0);
   }
 
   function previewExpiryForRestore(user) {
     const remaining = user.proRemainingDays ?? 0;
-    const d = new Date();
-    d.setTime(d.getTime() + remaining * 24 * 60 * 60 * 1000);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatDateAR(addDays(new Date(), remaining)) ?? '—';
   }
 
   function previewExpiryForNewPeriod(user, days) {
+    const { isProActive, expiresAt } = getPlanStatus(user);
     const now = new Date();
-    const isPro = user.pro === true || user.planType === 'pro';
-    let base = now;
-    if (isPro && user.proExpiresAt) {
-      const exp = user.proExpiresAt.toDate
-        ? user.proExpiresAt.toDate()
-        : new Date(user.proExpiresAt);
-      if (exp > now) base = exp;
-    }
-    const d = new Date(base);
-    d.setDate(d.getDate() + days);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const base = isProActive && expiresAt && expiresAt > now ? expiresAt : now;
+    return formatDateAR(addDays(base, days)) ?? '—';
   }
 
   function handleProPress(user, days) {
@@ -134,6 +156,8 @@ export default function AdminUsersScreen({ navigation }) {
   function handleReactivatePress(user) {
     setActionDialog({ type: 'reactivate_confirm', user });
   }
+
+  // ── Diálogos de acción ───────────────────────────────────────────────────────
 
   function renderActionDialog() {
     if (!actionDialog) return null;
@@ -181,7 +205,8 @@ export default function AdminUsersScreen({ navigation }) {
     }
 
     if (type === 'activate_confirm') {
-      const isExtension = getPlanStatus(user) === 'pro_active';
+      // Usar .isProActive en lugar de comparar el objeto con string
+      const isExtension = getPlanStatus(user).isProActive;
       const expiry = previewExpiryForNewPeriod(user, days);
       const durationLabel = PRO_DURATIONS.find(p => p.days === days)?.label ?? `${days} días`;
       return (
@@ -200,7 +225,7 @@ export default function AdminUsersScreen({ navigation }) {
             <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
             <Button
               mode="contained"
-              buttonColor='#2F9E44'
+              buttonColor="#2F9E44"
               onPress={() => { setActionDialog(null); runAction(() => activateUserProWithDuration(user.id, days)); }}
             >
               {isExtension ? 'Extender' : 'Activar'}
@@ -258,7 +283,7 @@ export default function AdminUsersScreen({ navigation }) {
             <Button onPress={() => setActionDialog(null)}>Cancelar</Button>
             <Button
               mode="contained"
-              buttonColor='#2F9E44'
+              buttonColor="#2F9E44"
               onPress={() => { setActionDialog(null); runAction(() => reactivateUser(user.id)); }}
             >
               Reactivar
@@ -271,125 +296,106 @@ export default function AdminUsersScreen({ navigation }) {
     return null;
   }
 
+  // ── Tarjeta de usuario (compacta) ────────────────────────────────────────────
+
   function renderUser({ item: u }) {
-    const status = getPlanStatus(u);
-    const isSuspended = status === 'suspended';
-    const isProActive = status === 'pro_active';
+    const {
+      status,
+      isSuspended,
+      isProActive,
+      remainingDays: days,
+      expiryDateFormatted: expiryDate,
+    } = getPlanStatus(u);
     const isProExpired = status === 'pro_expired';
-    const isDemo = status === 'demo';
+    const isDemo       = status === 'demo';
 
-    const days = getDaysUntilExpiry(u);
-    const expiryDate = formatExpiryDate(u);
-    const createdAt = formatDate(u.createdAt);
-    const lastAccess = formatDate(u.lastAccessAt);
-
-    const badgeLabel = isSuspended
-      ? 'SUSPENDIDO'
-      : isProActive
-        ? 'PRO'
-        : isProExpired
-          ? 'PRO VENCIDO'
-          : 'DEMO';
-    const badgeColor = isSuspended
-      ? colors.error
-      : isProActive
-        ? '#2F9E44'
-        : isProExpired
-          ? '#ADB5BD'
-          : colors.warning;
+    const createdAt  = formatDateAR(u.createdAt);
+    // Preferir lastLoginAt (si existe), caer a lastAccessAt
+    const lastLogin  = formatRelativeTime(u.lastLoginAt ?? u.lastAccessAt);
 
     return (
       <Surface style={styles.userCard} elevation={1}>
-        {/* Encabezado */}
+
+        {/* ── Header: nombre + badge ── */}
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text variant="bodyLarge" style={styles.businessName} numberOfLines={1}>
               {u.businessName || u.ownerName || 'Sin nombre'}
             </Text>
             {u.ownerName && u.businessName ? (
-              <Text variant="bodySmall" style={styles.ownerName} numberOfLines={1}>
-                {u.ownerName}
-              </Text>
+              <Text style={styles.ownerName} numberOfLines={1}>{u.ownerName}</Text>
             ) : null}
-            <Text variant="bodySmall" style={styles.email} numberOfLines={1}>
-              {u.email}
-            </Text>
+            <Text style={styles.email} numberOfLines={1}>{u.email}</Text>
           </View>
-          <View style={[styles.planBadge, { backgroundColor: badgeColor }]}>
-            <Text style={styles.planBadgeText}>{badgeLabel}</Text>
-          </View>
+          <PlanBadge
+            isSuspended={isSuspended}
+            isProActive={isProActive}
+            isProExpired={isProExpired}
+          />
         </View>
 
-        {/* ID corto */}
+        {/* ── Meta: ID + fecha de alta ── */}
         <View style={styles.metaRow}>
-          <MaterialCommunityIcons name="identifier" size={14} color={colors.textSecondary} />
-          <Text variant="bodySmall" style={styles.metaText}>ID: {shortUid(u.id)}</Text>
+          <MaterialCommunityIcons name="identifier" size={13} color={colors.textSecondary} />
+          <Text style={styles.metaText}>
+            {shortUid(u.id)}{createdAt ? `  ·  Alta: ${createdAt}` : ''}
+          </Text>
         </View>
 
-        {/* Vencimiento Pro */}
+        {/* ── Último acceso ── */}
+        <View style={styles.metaRow}>
+          <MaterialCommunityIcons name="clock-outline" size={13} color={colors.textSecondary} />
+          <Text style={styles.metaText}>Último acceso: {lastLogin}</Text>
+        </View>
+
+        {/* ── Vencimiento Pro activo ── */}
         {isProActive && expiryDate && days !== null && (
           <View style={styles.expiryRow}>
-            <MaterialCommunityIcons name="clock-outline" size={14} color='#2F9E44' />
-            <Text variant="bodySmall" style={styles.expiryActive}>
-              Vence: {expiryDate} · Restan: {days} día{days !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        )}
-        {isProExpired && expiryDate && days !== null && (
-          <View style={styles.expiryRow}>
-            <MaterialCommunityIcons name="clock-alert-outline" size={14} color={colors.error} />
-            <Text variant="bodySmall" style={styles.expiryExpired}>
-              Venció el {expiryDate} · Hace {Math.abs(days)} día{Math.abs(days) !== 1 ? 's' : ''}
+            <MaterialCommunityIcons name="calendar-check-outline" size={13} color="#2F9E44" />
+            <Text style={styles.expiryActive}>
+              Vence: {expiryDate} · Restan {days} día{days !== 1 ? 's' : ''}
             </Text>
           </View>
         )}
 
-        {/* Días Pro guardados (visible solo en Demo cuando hay días pendientes) */}
+        {/* ── Pro vencido ── */}
+        {isProExpired && expiryDate && days !== null && (
+          <View style={styles.expiryRow}>
+            <MaterialCommunityIcons name="calendar-alert" size={13} color={colors.error} />
+            <Text style={styles.expiryExpired}>
+              Venció: {expiryDate} · Hace {Math.abs(days)} día{Math.abs(days) !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Días Pro guardados (Demo con días pendientes) ── */}
         {isDemo && (u.proRemainingDays ?? 0) > 0 && (
-          <View style={styles.savedDaysRow}>
-            <MaterialCommunityIcons name="clock-check-outline" size={14} color={colors.warning} />
-            <Text variant="bodySmall" style={styles.savedDaysText}>
+          <View style={styles.metaRow}>
+            <MaterialCommunityIcons name="clock-check-outline" size={13} color={colors.warning} />
+            <Text style={[styles.metaText, { color: colors.warning, fontWeight: '600' }]}>
               {u.proRemainingDays} días Pro guardados
             </Text>
           </View>
         )}
 
-        {/* Stats */}
+        {/* ── Stats compactos ── */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Este mes</Text>
             <Text style={styles.statValue}>
-              {u.quotesThisMonth ?? 0} / {isProActive ? '∞' : (u.quoteLimit ?? 3)}
+              {u.quotesThisMonth ?? 0} / {isProActive ? '∞' : (u.quoteLimit ?? APP_CONFIG.demoQuoteLimit)}
             </Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statLabel}>Total creados</Text>
             <Text style={styles.statValue}>{u.totalQuotes ?? 0}</Text>
           </View>
-          {createdAt && (
-            <>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Alta</Text>
-                <Text style={styles.statValue}>{createdAt}</Text>
-              </View>
-            </>
-          )}
-          {lastAccess && (
-            <>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Último acceso</Text>
-                <Text style={styles.statValue}>{lastAccess}</Text>
-              </View>
-            </>
-          )}
         </View>
 
-        {/* Acciones */}
+        {/* ── Acciones ── */}
         <View style={styles.actions}>
-          {/* Botones Pro con duración (para demo, pro_expired y pro_active) */}
+          {/* Botones Pro */}
           {!isSuspended && (
             <View style={styles.proGroup}>
               <Text style={styles.proGroupLabel}>
@@ -409,67 +415,70 @@ export default function AdminUsersScreen({ navigation }) {
             </View>
           )}
 
-          {/* Pasar a Demo (solo si es Pro activo) */}
-          {isProActive && !isSuspended && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.warning }]}
-              onPress={() => handleDemoPress(u)}
-            >
-              <Text style={styles.actionBtnText}>Pasar a Demo</Text>
-            </TouchableOpacity>
-          )}
+          {/* Botones secundarios en fila horizontal */}
+          <View style={styles.actionRow}>
+            {isProActive && !isSuspended && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.warning }]}
+                onPress={() => handleDemoPress(u)}
+              >
+                <Text style={styles.actionBtnText}>Pasar a Demo</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Cambiar límite (solo Demo o Pro vencido) */}
-          {(isDemo || isProExpired) && !isSuspended && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-              onPress={() => openLimitDialog(u)}
-            >
-              <Text style={styles.actionBtnText}>Cambiar límite</Text>
-            </TouchableOpacity>
-          )}
+            {(isDemo || isProExpired) && !isSuspended && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                onPress={() => openLimitDialog(u)}
+              >
+                <Text style={styles.actionBtnText}>Cambiar límite</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Suspender */}
-          {!isSuspended && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.error }]}
-              onPress={() =>
-                Alert.alert(
-                  'Suspender usuario',
-                  `¿Suspender a ${u.email}?`,
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Suspender',
-                      style: 'destructive',
-                      onPress: () => runAction(() => suspendUser(u.id)),
-                    },
-                  ]
-                )
-              }
-            >
-              <Text style={styles.actionBtnText}>Suspender</Text>
-            </TouchableOpacity>
-          )}
+            {!isSuspended && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.error }]}
+                onPress={() =>
+                  Alert.alert(
+                    'Suspender usuario',
+                    `¿Suspender a ${u.email}?`,
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Suspender',
+                        style: 'destructive',
+                        onPress: () => runAction(() => suspendUser(u.id)),
+                      },
+                    ]
+                  )
+                }
+              >
+                <Text style={styles.actionBtnText}>Suspender</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Reactivar */}
-          {isSuspended && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#2F9E44' }]}
-              onPress={() => handleReactivatePress(u)}
-            >
-              <Text style={styles.actionBtnText}>Reactivar</Text>
-            </TouchableOpacity>
-          )}
+            {isSuspended && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#2F9E44' }]}
+                onPress={() => handleReactivatePress(u)}
+              >
+                <Text style={styles.actionBtnText}>Reactivar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
+
       </Surface>
     );
   }
+
+  // ── Render principal ──────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.container}>
       <AppLoader visible={actionLoading || loading} />
 
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -483,6 +492,7 @@ export default function AdminUsersScreen({ navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
+      {/* Barra de búsqueda */}
       <View style={styles.searchWrapper}>
         <TextInput
           value={search}
@@ -501,12 +511,21 @@ export default function AdminUsersScreen({ navigation }) {
         />
       </View>
 
+      {/* Lista de usuarios — optimizada para cientos de items */}
       <FlatList
         data={filtered}
         keyExtractor={u => u.id}
-        contentContainerStyle={styles.list}
         renderItem={renderUser}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: Math.max(40, insets.bottom + 24) },
+        ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={Platform.OS === 'android'}
+        initialNumToRender={8}
+        maxToRenderPerBatch={5}
+        windowSize={5}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="account-search-outline" size={48} color={colors.border} />
@@ -515,8 +534,16 @@ export default function AdminUsersScreen({ navigation }) {
             </Text>
           </View>
         }
+        ListFooterComponent={
+          filtered.length > 0 ? (
+            <Text style={styles.footerText}>
+              {filtered.length} usuario{filtered.length !== 1 ? 's' : ''} mostrado{filtered.length !== 1 ? 's' : ''}
+            </Text>
+          ) : null
+        }
       />
 
+      {/* Diálogos */}
       <Portal>
         {renderActionDialog()}
         <Dialog
@@ -545,8 +572,11 @@ export default function AdminUsersScreen({ navigation }) {
   );
 }
 
+// ── Estilos ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -556,10 +586,13 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerTitle: { fontWeight: '700', color: colors.text },
-  searchWrapper: { paddingHorizontal: 20, paddingBottom: 12 },
+
+  searchWrapper: { paddingHorizontal: 20, paddingBottom: 10 },
   searchInput: { backgroundColor: colors.surface, fontSize: 14 },
   searchOutline: { borderRadius: 12 },
-  list: { paddingHorizontal: 20, paddingBottom: 40, gap: 12, flexGrow: 1 },
+
+  list: { paddingHorizontal: 16, gap: 10, flexGrow: 1 },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -567,41 +600,77 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     gap: 12,
   },
-  userCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, gap: 10 },
+
+  footerText: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: 12,
+    paddingVertical: 12,
+  },
+
+  // ── Tarjeta ──
+  userCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    gap: 7,
+  },
+
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  businessName: { fontWeight: '700', color: colors.text },
-  ownerName: { color: colors.text, fontWeight: '500', marginTop: 2 },
-  email: { color: colors.textSecondary, marginTop: 1 },
-  planBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' },
-  planBadgeText: { color: '#fff', fontWeight: '700', fontSize: 10 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { color: colors.textSecondary, fontFamily: 'monospace' },
+  businessName: { fontWeight: '700', color: colors.text, fontSize: 15 },
+  ownerName: { color: colors.text, fontWeight: '500', fontSize: 12, marginTop: 1 },
+  email: { color: colors.textSecondary, fontSize: 12, marginTop: 1 },
+
+  // ── Badge ──
+  planBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  badgeSuspended: { backgroundColor: '#E03131' },
+  badgePro:       { backgroundColor: '#2F9E44' },
+  badgeExpired:   { backgroundColor: '#868E96' },
+  badgeDemo:      { backgroundColor: '#F08C00' },
+  planBadgeText: { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+
+  // ── Meta rows ──
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText: { color: colors.textSecondary, fontSize: 12 },
+
   expiryRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  expiryActive: { color: '#2F9E44', fontWeight: '600' },
-  expiryExpired: { color: colors.error, fontWeight: '600' },
+  expiryActive:  { color: '#2F9E44', fontWeight: '600', fontSize: 12 },
+  expiryExpired: { color: colors.error, fontWeight: '600', fontSize: 12 },
+
+  // ── Stats ──
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     backgroundColor: colors.surfaceVariant,
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 8,
+    paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  statItem: { alignItems: 'center', flex: 1, minWidth: 70, gap: 2 },
+  statItem: { alignItems: 'center', flex: 1, gap: 2 },
   statLabel: { color: colors.textSecondary, fontSize: 10, textAlign: 'center' },
-  statValue: { color: colors.text, fontWeight: '700', textAlign: 'center', fontSize: 14 },
-  statDivider: { width: 1, height: 28, backgroundColor: colors.border },
-  actions: { gap: 8 },
-  proGroup: { gap: 6 },
+  statValue: { color: colors.text, fontWeight: '700', textAlign: 'center', fontSize: 13 },
+  statDivider: { width: 1, height: 24, backgroundColor: colors.border },
+
+  // ── Acciones ──
+  actions: { gap: 7 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  proGroup: { gap: 5 },
   proGroupLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  proGroupBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start' },
+  proGroupBtns:  { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+  actionBtn: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 8, alignSelf: 'flex-start' },
   btnPro: { backgroundColor: '#2F9E44' },
   actionBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+
+  // ── Diálogos ──
   dialog: { borderRadius: 20 },
-  savedDaysRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  savedDaysText: { color: colors.warning, fontWeight: '600' },
   dialogOption: {
     borderWidth: 1,
     borderColor: colors.border,

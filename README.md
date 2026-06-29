@@ -7,6 +7,45 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.5 (2026-06-28)
+
+**Historial de presupuestos — rediseño completo:**
+
+- Paginación real contra Firestore: carga inicial de 20 presupuestos con `limit(20)` + `orderBy('createdAt', 'desc')`. Botón "Cargar más" usa `startAfter(lastDoc)` para páginas siguientes. Ya no se trae toda la colección.
+- Modal de filtros: reemplaza las dos filas de chips (11 controles) por una barra compacta de una línea con dos pills (`Estado: Todos` / `Fecha: Todas`) y un ícono con badge numérico. El modal (`animationType="slide"`) permite elegir estado y rango de fecha sin aplicar hasta presionar "Aplicar".
+- Filtros por estado modifican la query Firestore directamente (`where('status', '==', value)`), no filtran en memoria.
+- Filtros por fecha modifican la query Firestore (`where('createdAt', '>=', Timestamp)`), no filtran en memoria.
+- Búsqueda normalizada: `normalizeText()` elimina tildes y pasa a minúsculas antes de comparar. Busca en nombre, teléfono, email del cliente, número de presupuesto y total. Búsqueda local sobre los resultados cargados.
+- Agrupación temporal: encabezados de sección "Hoy / Ayer / Esta semana / Este mes / Junio 2026" intercalados en el FlatList sin SectionList.
+- `useHistoryQuotes` hook independiente (`getDocs` one-shot) con `refresh()`, `loadMore()`, `removeQuote()` y `updateQuoteLocal()` para mutaciones sin re-fetch.
+- Índices Firestore requeridos: `quotes: userId ASC, createdAt DESC` y `quotes: userId ASC, status ASC, createdAt DESC`.
+
+**Panel de administración — mejoras visuales y corrección de bugs:**
+
+- Fix crítico: los contadores del Dashboard (Pro activo, Demo, Suspendidos) siempre mostraban 0 porque se comparaba el objeto devuelto por `getPlanStatus()` contra un string literal. Ahora usa `.status`.
+- Fix: el dialog "Extender Pro" siempre decía "Activar Pro" porque `getPlanStatus(user) === 'pro_active'` nunca era true (objeto vs string). Ahora usa `.isProActive`.
+- Badges con ícono + color: SUSPENDIDO (rojo + alert-circle), PRO (verde + crown), VENCIDO (gris + crown-off), DEMO (naranja + star-outline).
+- Tarjetas de usuario ~30% más compactas (padding 16→12, gap 10→7).
+- Tiempo relativo de último acceso: "Hace 2 días", "Hace 1 mes", "Nunca".
+- FlatList optimizado: `removeClippedSubviews`, `initialNumToRender=8`, `maxToRenderPerBatch=5`, `windowSize=5`.
+- Sección de resumen en Dashboard: registrados, activos, suspendidos, Pro vencido.
+
+**SafeArea Android:**
+
+- Fix del BottomTabNavigator: la barra de navegación del sistema (botones/gestos) tapaba las pestañas en Android. Solucionado en `AppTabNavigator.js` con `useSafeAreaInsets()` — `tabBarStyle.height = 64 + insets.bottom`, `paddingBottom = insets.bottom > 0 ? insets.bottom : 8`. No se toca ninguna pantalla individual.
+
+**Deuda técnica — centralización:**
+
+- `src/config/appConfig.js`: fuente única de constantes (`demoQuoteLimit`, `proDurations`, `pdf.firstPageItems`, `supportEmail`, etc.).
+- `src/utils/dateUtils.js`: `timestampToDate()`, `formatDateAR()`, `addDays()`, `getDaysRemaining()`, `formatRelativeTime()`. Elimina 5+ patrones duplicados en servicios y pantallas.
+- `src/utils/planStatus.js` reescrito: `getPlanStatus()` devuelve objeto rico (`status`, `isProActive`, `canCreateQuote`, `remainingDays`, `demoRemainingQuotes`, etc.) en lugar de un string.
+- `src/utils/errorUtils.js`: `logError()` centralizado (solo loguea en `__DEV__`; hook para Sentry futuro).
+- `src/utils/searchUtils.js`: `normalizeText()` y `matchesSearch()` reutilizables.
+- `src/hooks/useHistoryQuotes.js`: hook de paginación separado de `useQuotes` (que mantiene onSnapshot para tiempo real).
+- `firestore.rules` y `storage.rules` versionados en el repositorio.
+
+---
+
 ### v1.0.4 (2026-06-15)
 
 **Campo nombre del responsable (`ownerName`):**

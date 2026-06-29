@@ -3,6 +3,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { buildQuoteHTML } from '../utils/pdfTemplate';
+import { formatDateAR } from '../utils/dateUtils';
+import { logError } from '../utils/errorUtils';
 
 export function sanitizeFileName(str) {
   return (str ?? '')
@@ -120,17 +122,8 @@ export function buildWhatsAppMessage(quote) {
   msg += '.\n\nTotal: ' + total;
 
   if (quote.validUntil) {
-    try {
-      const d = quote.validUntil.toDate
-        ? quote.validUntil.toDate()
-        : new Date((quote.validUntil.seconds ?? 0) * 1000);
-      const fecha = d.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-      msg += '\nValido hasta: ' + fecha;
-    } catch {}
+    const fecha = formatDateAR(quote.validUntil);
+    if (fecha) msg += '\nValido hasta: ' + fecha;
   }
 
   msg += '\n\nCualquier consulta escribime!';

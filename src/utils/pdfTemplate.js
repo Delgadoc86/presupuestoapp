@@ -1,4 +1,6 @@
 import { DISCOUNT_TYPE, QUOTE_STATUS_LABEL } from './constants';
+import { formatDateAR } from './dateUtils';
+import { APP_CONFIG } from '../config/appConfig';
 
 const STATUS_COLOR = {
   draft: '#868E96',
@@ -9,8 +11,8 @@ const STATUS_COLOR = {
 };
 
 // Conservative thresholds — accounts for row height variability (long descriptions wrap)
-const ITEMS_FIRST_PAGE = 12;
-const ITEMS_PER_PAGE = 20;
+const ITEMS_FIRST_PAGE = APP_CONFIG.pdf.firstPageItems;
+const ITEMS_PER_PAGE = APP_CONFIG.pdf.itemsPerPage;
 
 function fmt(n) {
   return new Intl.NumberFormat('es-AR', {
@@ -22,13 +24,7 @@ function fmt(n) {
 }
 
 function fmtDate(ts) {
-  if (!ts) return '—';
-  try {
-    const d = ts.toDate ? ts.toDate() : new Date((ts.seconds ?? 0) * 1000);
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch {
-    return '—';
-  }
+  return formatDateAR(ts) ?? '—';
 }
 
 function padNum(n) {

@@ -8,21 +8,12 @@ import { useBusinessContext } from '../../context/BusinessContext';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { colors } from '../../theme/colors';
 import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
-import {
-  getPlanStatus,
-  getDaysUntilExpiry,
-  formatExpiryDate,
-} from '../../utils/planStatus';
-
-function _currentYearMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
+import { getPlanStatus } from '../../utils/planStatus';
 
 function PlanBanner({ userData, userEmail }) {
   if (!userData) return null;
 
-  const status = getPlanStatus(userData);
+  const { status, remainingDays, expiryDateFormatted, demoRemainingQuotes } = getPlanStatus(userData);
 
   if (status === 'suspended') {
     return (
@@ -40,23 +31,20 @@ function PlanBanner({ userData, userEmail }) {
   }
 
   if (status === 'pro_active') {
-    const expiryDate = formatExpiryDate(userData);
-    const days = getDaysUntilExpiry(userData);
     return (
       <View style={[styles.banner, styles.bannerPro]}>
         <MaterialCommunityIcons name="crown" size={16} color="#2F9E44" />
         <Text variant="bodySmall" style={styles.bannerTextPro}>
           Plan Pro activo
-          {expiryDate ? ` · Vence el ${expiryDate}` : ''}
-          {days !== null && days <= 30 ? ` (${days} día${days !== 1 ? 's' : ''})` : ''}
+          {expiryDateFormatted ? ` · Vence el ${expiryDateFormatted}` : ''}
+          {remainingDays !== null && remainingDays <= 30 ? ` (${remainingDays} día${remainingDays !== 1 ? 's' : ''})` : ''}
         </Text>
       </View>
     );
   }
 
   if (status === 'pro_expired') {
-    const days = getDaysUntilExpiry(userData);
-    const overdue = Math.abs(days ?? 0);
+    const overdue = Math.abs(remainingDays ?? 0);
     return (
       <TouchableOpacity
         style={[styles.banner, styles.bannerDemo]}
@@ -72,11 +60,6 @@ function PlanBanner({ userData, userEmail }) {
   }
 
   // demo
-  const currentMonth = _currentYearMonth();
-  const used =
-    (userData.quoteMonth ?? '') === currentMonth ? (userData.quotesThisMonth ?? 0) : 0;
-  const limit = userData.quoteLimit ?? 3;
-  const remaining = Math.max(0, limit - used);
   return (
     <TouchableOpacity
       style={[styles.banner, styles.bannerDemo]}
@@ -85,7 +68,7 @@ function PlanBanner({ userData, userEmail }) {
     >
       <MaterialCommunityIcons name="star-outline" size={16} color="#fff" />
       <Text variant="bodySmall" style={styles.bannerText}>
-        Plan Demo · {remaining} presupuesto{remaining !== 1 ? 's' : ''} restante{remaining !== 1 ? 's' : ''} este mes — Activar Pro
+        Plan Demo · {demoRemainingQuotes} presupuesto{demoRemainingQuotes !== 1 ? 's' : ''} restante{demoRemainingQuotes !== 1 ? 's' : ''} este mes — Activar Pro
       </Text>
     </TouchableOpacity>
   );

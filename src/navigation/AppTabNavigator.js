@@ -33,6 +33,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/home/HomeScreen';
 import QuoteFormScreen from '../screens/quotes/QuoteFormScreen';
@@ -86,6 +87,7 @@ function SettingsNavigator() {
 
 export default function AppTabNavigator() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -97,9 +99,9 @@ export default function AppTabNavigator() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#DEE2E6',
-          paddingBottom: 8,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 8,
-          height: 65,
+          height: 64 + insets.bottom,
         },
         tabBarLabelStyle: {
           fontSize: 12,

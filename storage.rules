@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // logos/{userId}/logo.jpg
+    // Cualquier usuario autenticado puede leer logos (necesario para PDF y preview).
+    // Solo el propio usuario puede subir/eliminar su logo.
+    match /logos/{userId}/{allPaths=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

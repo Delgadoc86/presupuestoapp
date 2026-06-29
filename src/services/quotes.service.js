@@ -6,26 +6,17 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
+  limit,
+  startAfter,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-
-function _currentYearMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function _isEffectivelyPro(userData) {
-  const isPro = userData.pro === true || userData.planType === 'pro';
-  if (!isPro) return false;
-  if (userData.proExpiresAt) {
-    const expires = userData.proExpiresAt.toDate
-      ? userData.proExpiresAt.toDate()
-      : new Date(userData.proExpiresAt);
-    if (expires < new Date()) return false;
-  }
-  return true;
-}
+import { db } from '../../firebase.config';
+import { getCurrentYearMonth } from '../utils/dateUtils';
+import { isEffectivelyPro } from '../utils/planStatus';
+import { APP_CONFIG } from '../config/appConfig';
+import { logError } from '../utils/errorUtils';
 
 function _checkUserLimits(userData) {
   if (userData.enabled === false) {
@@ -33,12 +24,12 @@ function _checkUserLimits(userData) {
     err.code = 'account_suspended';
     throw err;
   }
-  if (!_isEffectivelyPro(userData)) {
-    const currentMonth = _currentYearMonth();
+  if (!isEffectivelyPro(userData)) {
+    const currentMonth = getCurrentYearMonth();
     const quotesThisMonth =
       (userData.quoteMonth ?? '') === currentMonth ? (userData.quotesThisMonth ?? 0) : 0;
-    const limit = userData.quoteLimit ?? 3;
-    if (quotesThisMonth >= limit) {
+    const quoteLimit = userData.quoteLimit ?? APP_CONFIG.demoQuoteLimit;
+    if (quotesThisMonth >= quoteLimit) {
       const err = new Error('Límite demo alcanzado');
       err.code = 'demo_limit_reached';
       throw err;
@@ -47,7 +38,78 @@ function _checkUserLimits(userData) {
   }
   return null;
 }
-import { db } from '../../firebase.config';
+
+/** Presupuestos por página en el historial paginado. */
+export const PAGE_SIZE = 20;
+
+/**
+ * Convierte el filtro de fecha UI en un Timestamp de Firestore para la query.
+ * Retorna null si no hay filtro de fecha activo.
+ *
+ * @param {'today'|'7days'|'month'|'year'|null} dateFilter
+ * @returns {import('firebase/firestore').Timestamp|null}
+ */
+export function getDateFilterTimestamp(dateFilter) {
+  if (!dateFilter) return null;
+  const now = new Date();
+  let startDate;
+  switch (dateFilter) {
+    case 'today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case '7days':
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case 'month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      break;
+    default:
+      return null;
+  }
+  return Timestamp.fromDate(startDate);
+}
+
+/**
+ * Construye la query paginada para el historial de presupuestos.
+ *
+ * Índices Firestore necesarios:
+ *   1. quotes: userId ASC, createdAt DESC          → base + filtro fecha
+ *   2. quotes: userId ASC, status ASC, createdAt DESC → filtro estado (± fecha)
+ *
+ * Firebase generará los links de creación de índice en la consola/logcat
+ * la primera vez que se ejecute cada query.
+ *
+ * @param {string} userId
+ * @param {{ statusFilter?: string|null, dateFilter?: string|null, lastDoc?: any }} opts
+ * @returns {import('firebase/firestore').Query}
+ */
+export function buildHistoryQuery(userId, { statusFilter = null, dateFilter = null, lastDoc = null } = {}) {
+  const constraints = [
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),
+  ];
+
+  if (statusFilter) {
+    constraints.push(where('status', '==', statusFilter));
+  }
+
+  const dateFrom = getDateFilterTimestamp(dateFilter);
+  if (dateFrom) {
+    constraints.push(where('createdAt', '>=', dateFrom));
+  }
+
+  constraints.push(limit(PAGE_SIZE));
+
+  if (lastDoc) {
+    constraints.push(startAfter(lastDoc));
+  }
+
+  return query(collection(db, 'quotes'), ...constraints);
+}
 
 /**
  * Retorna la query de Firestore que filtra los presupuestos del usuario.
@@ -88,8 +150,8 @@ export async function createQuote(userId, quoteData) {
 
     const lastNumber = userData.lastQuoteNumber ?? 0;
     const nextNumber = lastNumber + 1;
-    const currentMonth = _currentYearMonth();
-    const effectivelyPro = _isEffectivelyPro(userData);
+    const currentMonth = getCurrentYearMonth();
+    const effectivelyPro = isEffectivelyPro(userData);
 
     transaction.update(userRef, {
       lastQuoteNumber: nextNumber,
@@ -121,10 +183,15 @@ export async function createQuote(userId, quoteData) {
  * @returns {Promise<void>}
  */
 export async function updateQuote(quoteId, data) {
-  await updateDoc(doc(db, 'quotes', quoteId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    await updateDoc(doc(db, 'quotes', quoteId), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    logError('updateQuote', error);
+    throw error;
+  }
 }
 
 /**
@@ -136,10 +203,15 @@ export async function updateQuote(quoteId, data) {
  * @returns {Promise<void>}
  */
 export async function updateQuoteStatus(quoteId, status) {
-  await updateDoc(doc(db, 'quotes', quoteId), {
-    status,
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    await updateDoc(doc(db, 'quotes', quoteId), {
+      status,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    logError('updateQuoteStatus', error);
+    throw error;
+  }
 }
 
 /**
@@ -150,7 +222,12 @@ export async function updateQuoteStatus(quoteId, status) {
  * @returns {Promise<void>}
  */
 export async function deleteQuote(quoteId) {
-  await deleteDoc(doc(db, 'quotes', quoteId));
+  try {
+    await deleteDoc(doc(db, 'quotes', quoteId));
+  } catch (error) {
+    logError('deleteQuote', error);
+    throw error;
+  }
 }
 
 /**
@@ -176,8 +253,8 @@ export async function duplicateQuote(userId, sourceQuote) {
 
     const lastNumber = userData.lastQuoteNumber ?? 0;
     const nextNumber = lastNumber + 1;
-    const currentMonth = _currentYearMonth();
-    const effectivelyPro = _isEffectivelyPro(userData);
+    const currentMonth = getCurrentYearMonth();
+    const effectivelyPro = isEffectivelyPro(userData);
 
     transaction.update(userRef, {
       lastQuoteNumber: nextNumber,
