@@ -21,11 +21,20 @@ export const QUOTE_STATUS_LABEL = {
 
 /** Colores asociados a cada estado (usados en badges y gráficos). */
 export const QUOTE_STATUS_COLOR = {
-  draft:    '#868E96',  // gris
-  sent:     '#339AF0',  // azul
-  accepted: '#40C057',  // verde
-  rejected: '#FA5252',  // rojo
-  paid:     '#20C997',  // verde agua
+  draft:    '#D97706',  // naranja
+  sent:     '#7C3AED',  // violeta
+  accepted: '#16A34A',  // verde
+  rejected: '#DC2626',  // rojo
+  paid:     '#16A34A',  // verde
+};
+
+/** Fondos suaves para badges de estado (pasteles que combinan con cada color). */
+export const QUOTE_STATUS_BG_COLOR = {
+  draft:    '#FFFBEB',
+  sent:     '#F5F3FF',
+  accepted: '#F0FDF4',
+  rejected: '#FEF2F2',
+  paid:     '#F0FDF4',
 };
 
 /**

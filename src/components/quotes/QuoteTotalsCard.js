@@ -5,21 +5,17 @@ import { formatCurrency } from '../../utils/formatters';
 import { DISCOUNT_TYPE } from '../../utils/constants';
 import { colors } from '../../theme/colors';
 
-function TotalRow({ label, value, bold, color }) {
+function TotalRow({ label, value, bold, color, size }) {
+  const textStyle = [
+    styles.rowText,
+    bold && styles.bold,
+    color && { color },
+    size && { fontSize: size },
+  ];
   return (
     <View style={styles.totalRow}>
-      <Text
-        variant={bold ? 'titleMedium' : 'bodyMedium'}
-        style={[styles.totalLabel, bold && styles.bold, color && { color }]}
-      >
-        {label}
-      </Text>
-      <Text
-        variant={bold ? 'titleMedium' : 'bodyMedium'}
-        style={[styles.totalValue, bold && styles.bold, color && { color }]}
-      >
-        {value}
-      </Text>
+      <Text style={textStyle}>{label}</Text>
+      <Text style={textStyle}>{value}</Text>
     </View>
   );
 }
@@ -34,37 +30,38 @@ export default function QuoteTotalsCard({
   onAdvanceChange,
 }) {
   const discountNum = parseFloat(discount) || 0;
-  const advanceNum = parseFloat(advance) || 0;
+  const advanceNum  = parseFloat(advance)  || 0;
 
   const discountAmount =
     discountType === DISCOUNT_TYPE.PERCENT
       ? subtotal * (discountNum / 100)
       : discountNum;
 
-  const total = Math.max(0, subtotal - discountAmount);
-  const saldo = Math.max(0, total - advanceNum);
+  const total  = Math.max(0, subtotal - discountAmount);
+  const saldo  = Math.max(0, total - advanceNum);
 
   return (
     <Surface style={styles.card} elevation={1}>
       <TotalRow label="Subtotal" value={formatCurrency(subtotal)} />
 
       {/* Descuento */}
-      <View style={styles.discountRow}>
-        <Text variant="bodyMedium" style={styles.totalLabel}>
-          Descuento
-        </Text>
-        <View style={styles.discountRight}>
-          <View style={styles.discountInputWrapper}>
+      <View style={styles.inputRow}>
+        <Text style={styles.rowText}>Descuento</Text>
+        <View style={styles.inputRight}>
+          <View style={styles.inputWithToggle}>
             <TextInput
               value={discount}
               onChangeText={onDiscountChange}
               mode="outlined"
               dense
               keyboardType="numeric"
-              style={styles.discountInput}
+              selectTextOnFocus
+              placeholder="0"
+              outlineColor={colors.border}
+              activeOutlineColor={colors.primary}
               outlineStyle={styles.inputOutline}
+              style={styles.numberInput}
             />
-            {/* Toggle $ / % */}
             <TouchableOpacity
               style={styles.typeToggle}
               onPress={() =>
@@ -75,15 +72,13 @@ export default function QuoteTotalsCard({
                 )
               }
             >
-              <Text variant="labelMedium" style={styles.typeLabel}>
+              <Text style={styles.typeLabel}>
                 {discountType === DISCOUNT_TYPE.FIXED ? '$' : '%'}
               </Text>
             </TouchableOpacity>
           </View>
           {discountAmount > 0 && (
-            <Text variant="bodyMedium" style={styles.discountAmount}>
-              -{formatCurrency(discountAmount)}
-            </Text>
+            <Text style={styles.discountAmount}>−{formatCurrency(discountAmount)}</Text>
           )}
         </View>
       </View>
@@ -94,33 +89,34 @@ export default function QuoteTotalsCard({
         label="TOTAL"
         value={formatCurrency(total)}
         bold
-        color={colors.primary}
+        color={colors.success}
+        size={18}
       />
 
       {/* Anticipo */}
-      <View style={styles.discountRow}>
-        <Text variant="bodyMedium" style={styles.totalLabel}>
-          Anticipo
-        </Text>
-        <View style={styles.discountRight}>
+      <View style={styles.inputRow}>
+        <Text style={styles.rowText}>Anticipo</Text>
+        <View style={styles.inputRight}>
           <TextInput
             value={advance}
             onChangeText={onAdvanceChange}
             mode="outlined"
             dense
             keyboardType="numeric"
-            style={styles.discountInput}
+            selectTextOnFocus
+            placeholder="0"
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
             outlineStyle={styles.inputOutline}
+            style={styles.numberInput}
           />
           {advanceNum > 0 && (
-            <Text variant="bodyMedium" style={{ color: colors.textSecondary }}>
-              -{formatCurrency(advanceNum)}
-            </Text>
+            <Text style={styles.discountAmount}>−{formatCurrency(advanceNum)}</Text>
           )}
         </View>
       </View>
 
-      {/* Saldo pendiente (solo si hay anticipo) */}
+      {/* Saldo pendiente */}
       {advanceNum > 0 && (
         <>
           <View style={styles.divider} />
@@ -128,7 +124,7 @@ export default function QuoteTotalsCard({
             label="Saldo pendiente"
             value={formatCurrency(saldo)}
             bold
-            color={colors.statusSent}
+            color={colors.sent}
           />
         </>
       )}
@@ -142,16 +138,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  totalLabel: {
-    color: colors.text,
-  },
-  totalValue: {
+  rowText: {
+    fontSize: 14,
     color: colors.text,
   },
   bold: {
@@ -161,23 +159,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
   },
-  discountRow: {
+  inputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
   },
-  discountRight: {
+  inputRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  discountInputWrapper: {
+  inputWithToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 0,
+    gap: 4,
   },
-  discountInput: {
+  numberInput: {
     width: 90,
     backgroundColor: colors.surface,
   },
@@ -187,18 +185,19 @@ const styles = StyleSheet.create({
   typeToggle: {
     width: 36,
     height: 36,
-    backgroundColor: colors.surfaceVariant,
+    backgroundColor: colors.primaryLight,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 4,
   },
   typeLabel: {
+    fontSize: 14,
     fontWeight: '700',
     color: colors.primary,
   },
   discountAmount: {
+    fontSize: 13,
     color: colors.error,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

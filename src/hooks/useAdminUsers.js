@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase.config';
+import { logError } from '../utils/errorUtils';
 
 export function useAdminUsers() {
   const [users, setUsers] = useState([]);
@@ -17,7 +18,7 @@ export function useAdminUsers() {
         setLoading(false);
       },
       error => {
-        console.error('useAdminUsers error:', error);
+        logError('useAdminUsers', error);
         setLoading(false);
       }
     );

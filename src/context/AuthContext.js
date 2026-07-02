@@ -15,6 +15,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase.config';
+import { logError } from '../utils/errorUtils';
 
 const AuthContext = createContext(null);
 
@@ -43,7 +44,7 @@ export function AuthProvider({ children }) {
             setLoading(false);
           },
           (error) => {
-            console.error('Error escuchando usuario:', error);
+            logError('AuthContext', error);
             setLoading(false);
           }
         );

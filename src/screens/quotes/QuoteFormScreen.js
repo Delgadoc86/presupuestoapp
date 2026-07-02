@@ -10,7 +10,7 @@ import {
   FlatList,
   Alert,
 } from 'react-native';
-import { Text, Surface, Button, useTheme } from 'react-native-paper';
+import { Text, Button, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -27,6 +27,7 @@ import { useTemplates } from '../../hooks/useTemplates';
 import { DISCOUNT_TYPE } from '../../utils/constants';
 import { colors } from '../../theme/colors';
 import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
+import { logError } from '../../utils/errorUtils';
 
 function generateItemId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -48,9 +49,9 @@ export default function QuoteFormScreen({ navigation, route }) {
   const [client, setClient] = useState(EMPTY_CLIENT);
   const [clientErrors, setClientErrors] = useState({});
   const [items, setItems] = useState([]);
-  const [discount, setDiscount] = useState('0');
+  const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPE.FIXED);
-  const [advance, setAdvance] = useState('0');
+  const [advance, setAdvance] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
@@ -72,9 +73,9 @@ export default function QuoteFormScreen({ navigation, route }) {
           subtotal: item.subtotal ?? 0,
         }))
       );
-      setDiscount(String(existingQuote.discount ?? 0));
+      setDiscount(existingQuote.discount ? String(existingQuote.discount) : '');
       setDiscountType(existingQuote.discountType ?? DISCOUNT_TYPE.FIXED);
-      setAdvance(String(existingQuote.advance ?? 0));
+      setAdvance(existingQuote.advance ? String(existingQuote.advance) : '');
       setNotes(existingQuote.notes ?? '');
     }
   }, []);
@@ -91,7 +92,7 @@ export default function QuoteFormScreen({ navigation, route }) {
   function addEmptyItem() {
     setItems(prev => [
       ...prev,
-      { id: generateItemId(), description: '', quantity: '1', unitPrice: '0', subtotal: 0 },
+      { id: generateItemId(), description: '', quantity: '1', unitPrice: '', subtotal: 0 },
     ]);
   }
 
@@ -134,6 +135,22 @@ export default function QuoteFormScreen({ navigation, route }) {
     if (Object.keys(errs).length > 0) return false;
     if (items.length === 0) {
       showSnackbar('Agregá al menos un ítem al presupuesto', 'error');
+      return false;
+    }
+    if (items.length > 50) {
+      showSnackbar('El presupuesto no puede tener más de 50 ítems', 'error');
+      return false;
+    }
+    if (items.some(item => !item.description.trim())) {
+      showSnackbar('Todos los ítems deben tener una descripción', 'error');
+      return false;
+    }
+    if (items.some(item => (parseFloat(item.quantity) || 0) <= 0)) {
+      showSnackbar('La cantidad de cada ítem debe ser mayor a 0', 'error');
+      return false;
+    }
+    if (items.some(item => (parseFloat(item.unitPrice) || 0) < 0)) {
+      showSnackbar('El precio no puede ser negativo', 'error');
       return false;
     }
     return true;
@@ -185,9 +202,9 @@ export default function QuoteFormScreen({ navigation, route }) {
         setClient(EMPTY_CLIENT);
         setClientErrors({});
         setItems([]);
-        setDiscount('0');
+        setDiscount('');
         setDiscountType(DISCOUNT_TYPE.FIXED);
-        setAdvance('0');
+        setAdvance('');
         setNotes('');
         showSnackbar('Presupuesto creado', 'success');
         navigation.navigate('QuoteDetail', { quoteId });
@@ -212,7 +229,7 @@ export default function QuoteFormScreen({ navigation, route }) {
           ]
         );
       } else {
-        console.error('Error guardando presupuesto:', error);
+        logError('QuoteFormScreen', error);
         showSnackbar('No se pudo guardar. Revisá tu conexión.', 'error');
       }
     } finally {
@@ -232,7 +249,7 @@ export default function QuoteFormScreen({ navigation, route }) {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text variant="titleLarge" style={styles.headerTitle}>
+        <Text style={styles.headerTitle}>
           {isEditing ? 'Editar presupuesto' : 'Nuevo presupuesto'}
         </Text>
         <View style={{ width: 24 }} />
@@ -249,9 +266,7 @@ export default function QuoteFormScreen({ navigation, route }) {
         >
           {/* Sección: Cliente */}
           <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              DATOS DEL CLIENTE
-            </Text>
+            <Text style={styles.sectionLabel}>DATOS DEL CLIENTE</Text>
             <AppInput
               label="Nombre *"
               value={client.name}
@@ -281,18 +296,21 @@ export default function QuoteFormScreen({ navigation, route }) {
           {/* Sección: Ítems */}
           <View style={styles.section}>
             <View style={styles.sectionRow}>
-              <Text variant="labelMedium" style={styles.sectionLabel}>
-                ÍTEMS ({items.length})
-              </Text>
+              <View style={styles.sectionLabelRow}>
+                <Text style={styles.sectionLabel}>ÍTEMS</Text>
+                {items.length > 0 && (
+                  <View style={styles.itemsBadge}>
+                    <Text style={styles.itemsBadgeText}>{items.length}</Text>
+                  </View>
+                )}
+              </View>
               {templates.length > 0 && (
                 <TouchableOpacity
                   onPress={() => setTemplateModalVisible(true)}
                   style={styles.templateBtn}
                 >
-                  <MaterialCommunityIcons name="file-document-outline" size={16} color={theme.colors.primary} />
-                  <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
-                    Usar plantilla
-                  </Text>
+                  <MaterialCommunityIcons name="file-document-outline" size={15} color={colors.primary} />
+                  <Text style={styles.templateBtnText}>Usar plantilla</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -307,20 +325,16 @@ export default function QuoteFormScreen({ navigation, route }) {
               />
             ))}
 
-            <TouchableOpacity style={styles.addItemBtn} onPress={addEmptyItem}>
-              <MaterialCommunityIcons name="plus-circle-outline" size={22} color={theme.colors.primary} />
-              <Text variant="labelLarge" style={{ color: theme.colors.primary }}>
-                Agregar ítem
-              </Text>
+            <TouchableOpacity style={styles.addItemBtn} onPress={addEmptyItem} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="plus-circle-outline" size={22} color={colors.primary} />
+              <Text style={styles.addItemText}>Agregar ítem</Text>
             </TouchableOpacity>
           </View>
 
           {/* Sección: Totales */}
           {items.length > 0 && (
             <View style={styles.section}>
-              <Text variant="labelMedium" style={styles.sectionLabel}>
-                TOTALES
-              </Text>
+              <Text style={styles.sectionLabel}>TOTALES</Text>
               <QuoteTotalsCard
                 subtotal={subtotal}
                 discount={discount}
@@ -335,9 +349,7 @@ export default function QuoteFormScreen({ navigation, route }) {
 
           {/* Sección: Notas */}
           <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              NOTAS (OPCIONAL)
-            </Text>
+            <Text style={styles.sectionLabel}>NOTAS (OPCIONAL)</Text>
             <AppInput
               label="Aclaraciones para el cliente"
               value={notes}
@@ -350,8 +362,9 @@ export default function QuoteFormScreen({ navigation, route }) {
           </View>
 
           <AppButton onPress={handleSave} loading={loading}>
-            {isEditing ? 'Guardar cambios' : 'Crear presupuesto'}
+            {isEditing ? 'Guardar cambios' : 'Crear presupuesto →'}
           </AppButton>
+
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -425,32 +438,62 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text,
   },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingTop: 8,
+    paddingBottom: 32,
     gap: 24,
   },
   section: {
     gap: 12,
   },
   sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textSecondary,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   sectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemsBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 20,
+  },
+  itemsBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   templateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    padding: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  templateBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
   addItemBtn: {
     flexDirection: 'row',
@@ -459,10 +502,15 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
     borderStyle: 'dashed',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primaryLight,
+  },
+  addItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
   },
   // Modal bottom sheet
   modalOverlay: {

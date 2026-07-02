@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 import { getDefaultTemplate } from '../data/defaultTemplates';
+import { logError } from '../utils/errorUtils';
 
 /**
  * Retorna la query de Firestore que filtra las plantillas del usuario.
@@ -127,7 +128,7 @@ export async function initDefaultTemplate(userId, sector) {
     });
   } catch (error) {
     // No bloqueamos el onboarding si falla la creación de la plantilla
-    console.warn('No se pudo crear la plantilla base:', error);
+    logError('initDefaultTemplate', error);
   }
 }
 

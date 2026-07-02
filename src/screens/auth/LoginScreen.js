@@ -15,6 +15,7 @@ import AppInput from '../../components/common/AppInput';
 import AppLoader from '../../components/common/AppLoader';
 import { loginWithEmail, getAuthErrorMessage } from '../../services/auth.service';
 import { useAppContext } from '../../context/AppContext';
+import { openSupportEmail } from '../../utils/contactHelper';
 import { colors } from '../../theme/colors';
 
 export default function LoginScreen({ navigation }) {
@@ -135,6 +136,15 @@ export default function LoginScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Soporte */}
+          <TouchableOpacity
+            style={styles.supportLink}
+            onPress={() => openSupportEmail('Consulta sobre PresúFácil', '')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.supportText}>¿Tenés dudas? Escribinos</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -192,5 +202,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  supportLink: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  supportText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="docShad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F0F6FF"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="18" flood-color="rgba(0,0,0,0.22)"/>
+    </filter>
+  </defs>
+
+  <!-- Fondo degradado azul -->
+  <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+
+  <!-- Detalles de fondo: círculos sutiles -->
+  <circle cx="900" cy="140" r="220" fill="rgba(255,255,255,0.05)"/>
+  <circle cx="120" cy="880" r="280" fill="rgba(255,255,255,0.04)"/>
+
+  <!-- Sombra del documento -->
+  <rect x="224" y="148" width="580" height="556" rx="52" fill="rgba(0,0,0,0.20)" filter="url(#shadow)"/>
+
+  <!-- Cuerpo del documento (papel) -->
+  <rect x="218" y="140" width="580" height="556" rx="52" fill="url(#docShad)"/>
+
+  <!-- Header del documento (banda azul claro) -->
+  <rect x="218" y="140" width="580" height="100" rx="52" fill="#EFF6FF"/>
+  <rect x="218" y="188" width="580" height="52" fill="#EFF6FF"/>
+
+  <!-- Línea de título del documento -->
+  <rect x="284" y="172" width="300" height="26" rx="13" fill="#BFDBFE"/>
+  <!-- Número de presupuesto (derecha) -->
+  <rect x="620" y="176" width="120" height="18" rx="9" fill="#93C5FD"/>
+
+  <!-- Líneas de contenido (ítems) -->
+  <!-- Item 1 -->
+  <rect x="284" y="298" width="420" height="22" rx="11" fill="#DBEAFE"/>
+  <rect x="640" y="298" width="100" height="22" rx="11" fill="#BFDBFE"/>
+
+  <!-- Item 2 -->
+  <rect x="284" y="342" width="340" height="18" rx="9" fill="#E2E8F0"/>
+  <rect x="640" y="342" width="100" height="18" rx="9" fill="#E2E8F0"/>
+
+  <!-- Item 3 -->
+  <rect x="284" y="380" width="380" height="18" rx="9" fill="#E2E8F0"/>
+  <rect x="640" y="380" width="100" height="18" rx="9" fill="#E2E8F0"/>
+
+  <!-- Item 4 (más corto) -->
+  <rect x="284" y="418" width="260" height="18" rx="9" fill="#E2E8F0"/>
+  <rect x="640" y="418" width="100" height="18" rx="9" fill="#E2E8F0"/>
+
+  <!-- Línea divisoria -->
+  <rect x="264" y="462" width="488" height="2.5" fill="#CBD5E1"/>
+
+  <!-- Fila de TOTAL -->
+  <!-- Label "TOTAL" -->
+  <rect x="284" y="484" width="110" height="18" rx="9" fill="#94A3B8"/>
+  <!-- Monto en verde -->
+  <rect x="450" y="476" width="298" height="40" rx="20" fill="#DCFCE7"/>
+  <rect x="490" y="490" width="218" height="14" rx="7" fill="#16A34A"/>
+
+  <!-- Badge de check verde (con anillo blanco para separarlo) -->
+  <circle cx="512" cy="768" r="128" fill="white"/>
+  <circle cx="512" cy="768" r="116" fill="#16A34A"/>
+
+  <!-- Checkmark path -->
+  <path d="M 460 768 L 496 808 L 566 720"
+        fill="none"
+        stroke="white"
+        stroke-width="28"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

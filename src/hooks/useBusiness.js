@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { saveBusinessProfile, completeOnboarding } from '../services/business.service';
 import { uploadLogo, deleteLogo as deleteLogoFromStorage } from '../services/storage.service';
 import { initDefaultTemplate } from '../services/templates.service';
+import { logError } from '../utils/errorUtils';
 
 const EMPTY_FORM = {
   ownerName: '',
@@ -80,7 +81,7 @@ export function useBusinessForm(isOnboarding = false) {
       setLogoUri(null);
       showSnackbar('Logo eliminado', 'success');
     } catch (error) {
-      console.error('Error eliminando logo:', error);
+      logError('deleteLogo', error);
       showSnackbar('No se pudo eliminar el logo', 'error');
     } finally {
       setLoading(false);
@@ -103,7 +104,6 @@ export function useBusinessForm(isOnboarding = false) {
       return false;
     }
     setLoading(true);
-    console.log('Guardando perfil para UID:', user.uid);
     try {
       // Determinar la URL del logo final
       let logoUrl = business?.logoUrl ?? null;
@@ -128,7 +128,7 @@ export function useBusinessForm(isOnboarding = false) {
       }
       return true;
     } catch (error) {
-      console.error('Error guardando perfil del negocio:', error);
+      logError('saveProfile', error);
       showSnackbar('No se pudo guardar. Revisá tu conexión.', 'error');
       return false;
     } finally {

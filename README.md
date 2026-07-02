@@ -7,6 +7,44 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.6 (2026-07-01)
+
+**Rediseño visual completo (UI/UX):**
+
+- Sistema de colores centralizado en `src/theme/colors.js`: paleta primaria azul `#2563EB`, verde `#16A34A`, violeta `#7C3AED`, tokens de fondo/superficie/texto/borde.
+- `QuoteCard` estilo conversacional: avatar circular del cliente coloreado por estado, monto en verde, meta line con número y fecha.
+- `QuoteStatusBadge` con fondos pastel correctos usando `QUOTE_STATUS_BG_COLOR` (antes usaba `${color}20`).
+- `QuoteItemRow` con shadow real (`elevation: 2`), subtotal en verde, etiquetas de campo en 11px mayúsculas.
+- `QuoteTotalsCard`: TOTAL en verde, saldo pendiente en violeta, toggle de tipo de descuento.
+- `AppInput` estilo filled con `borderRadius: 12` y colores del sistema de diseño.
+- `AppButton` con forma de píldora (`borderRadius: 50`), altura 54px, `fontWeight: 600`.
+- `AppTabNavigator` con sombra superior, etiquetas 11px bold, indicador tipo píldora en tab activo.
+- `HomeScreen` rediseñado: saludo dinámico (Buenos días/tardes/noches), grid de acciones rápidas con `Pressable` + `scale(0.97)`, estadísticas del mes desde Firestore, secciones con `gap: 10`.
+- `BusinessProfileScreen`: logo circular (`borderRadius: 50`).
+- Ícono de app personalizado: `assets/icon.svg` (gradiente azul, documento con ítems, badge verde); herramienta `scripts/generate-icons.html` para exportar todos los formatos PNG requeridos por Expo.
+- `app.json`: splash `backgroundColor` → `#2563EB`, adaptive icon `backgroundColor` → `#1D4ED8`.
+
+**Correcciones de UX:**
+
+- Botón "Guardar cambios" en `BusinessProfileScreen` movido dentro del `ScrollView` (ya no flota sobre el formulario).
+- Botón "Crear presupuesto" en `QuoteFormScreen` movido dentro del `ScrollView` (misma corrección).
+- Label "ADMINISTRACIÓN" en `HomeScreen` ya no era tapado por la card Admin (se eliminaron todos los `marginTop: -4` y se agruparon secciones en `<View style={styles.section}>`).
+
+**Preparación para beta — correcciones críticas:**
+
+- `ErrorBoundary` añadido en `App.js`: captura crashes de React y muestra pantalla de error con botón "Intentar de nuevo" en lugar de pantalla blanca.
+- Eliminados todos los `console.log` / `console.error` / `console.warn` del código de producción (16 ocurrencias en 11 archivos). Reemplazados por `logError()` de `errorUtils.js`, que solo loguea en `__DEV__`.
+- Eliminado `console.log('Guardando perfil para UID:', user.uid)` en `useBusiness.js` que exponía el UID del usuario en logs de producción.
+- Nuevas validaciones en `QuoteFormScreen`:
+  - Todos los ítems deben tener descripción no vacía.
+  - Cantidad de cada ítem debe ser mayor a 0.
+  - Precio no puede ser negativo.
+  - Máximo 50 ítems por presupuesto (previene PDFs corruptos).
+- Fix campos numéricos en formulario de presupuesto: `unitPrice` arranca vacío en ítems nuevos (antes mostraba "0"). `selectTextOnFocus` en cantidad, precio unitario, descuento y anticipo — al tocar, selecciona todo el valor para reemplazarlo directo. Campos de descuento y anticipo arrancan vacíos con `placeholder="0"`.
+- `expo-doctor` 18/18 checks sin issues.
+
+---
+
 ### v1.0.5 (2026-06-28)
 
 **Historial de presupuestos — rediseño completo:**
@@ -171,17 +209,18 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 
 | Módulo | Descripción |
 |---|---|
-| Autenticación | Registro, inicio de sesión y recuperación de contraseña vía Firebase Auth |
-| Perfil del negocio | Nombre del responsable (obligatorio), nombre del negocio (opcional), rubro, logo, WhatsApp, email, dirección, CUIT, condiciones generales |
-| Nuevo presupuesto | Datos del cliente, ítems con cantidad y precio unitario, descuento fijo o porcentual, anticipo, notas |
-| Historial | Listado de todos los presupuestos con búsqueda y filtros por estado |
-| Detalle de presupuesto | Vista completa, cambio de estado, edición, eliminación |
-| Compartir PDF | Genera un PDF profesional y abre el selector del sistema (WhatsApp, Gmail, Drive, etc.) |
-| Imprimir / Guardar PDF | Abre el diálogo de impresión del sistema, que también permite guardar como PDF |
-| Plantillas | Ítems predefinidos reutilizables para agilizar la carga |
+| Autenticación | Registro, login, verificación de email obligatoria, recuperación de contraseña, eliminación segura de cuenta |
+| Perfil del negocio | Nombre del responsable (obligatorio), nombre del negocio (opcional), rubro bloqueado post-onboarding, logo circular, WhatsApp, email, dirección, CUIT, condiciones generales, validez del presupuesto |
+| Nuevo presupuesto | Datos del cliente, ítems con descripción/cantidad/precio (validados), descuento fijo o porcentual, anticipo, notas, máximo 50 ítems |
+| Historial | Listado paginado (20 por página) con búsqueda normalizada y filtros por estado y rango de fecha vía Firestore |
+| Detalle de presupuesto | Vista completa, cambio de estado, edición, duplicación, eliminación |
+| Compartir PDF | Genera PDF profesional con logo base64, abre selector del sistema (WhatsApp, Gmail, Drive, etc.) |
+| Imprimir / Guardar PDF | Abre el diálogo de impresión del sistema; también permite guardar como PDF |
+| Plantillas | Ítems predefinidos reutilizables con 30+ plantillas base por rubro; CRUD completo con reordenamiento |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
 | Sistema Demo/Pro | Cuota mensual para Demo, planes Pro con fecha de vencimiento, banner de estado en Inicio |
-| Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio, accesible desde Inicio y Ajustes |
+| Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio/UID |
+| Estabilidad | ErrorBoundary global, logError() centralizado (solo activo en desarrollo), expo-doctor 18/18 ✓ |
 
 ---
 
@@ -389,12 +428,12 @@ presupuestoapp/
 ├── assets/                  # Íconos y recursos visuales
 ├── src/
 │   ├── components/          # Componentes reutilizables
-│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar, EmptyState
+│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar, EmptyState, ErrorBoundary
 │   │   ├── quotes/          # QuoteCard, QuoteItemRow, QuoteStatusBadge, QuoteTotalsCard
 │   │   └── templates/       # TemplateItemRow
 │   ├── context/             # AuthContext, BusinessContext, AppContext
 │   ├── data/                # defaultTemplates (plantillas predefinidas)
-│   ├── hooks/               # useBusiness, useQuotes, useTemplates, useIsAdmin, useAdminUsers
+│   ├── hooks/               # useBusiness, useQuotes, useHistoryQuotes, useTemplates, useIsAdmin, useAdminUsers
 │   ├── navigation/          # AppNavigator, AppTabNavigator, AuthNavigator
 │   ├── screens/             # Pantallas agrupadas por módulo
 │   │   ├── auth/            # Login, Register, ForgotPassword

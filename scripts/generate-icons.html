@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generador de íconos — PresúFácil</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      gap: 32px;
+      color: #0F172A;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin: 0; }
+    p  { color: #64748B; margin: 0; font-size: 14px; text-align: center; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .card h2 { font-size: 15px; font-weight: 600; margin: 0; color: #0F172A; }
+    .card p  { font-size: 12px; color: #64748B; margin: 0; text-align: center; }
+    canvas   { border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }
+    button {
+      background: #2563EB;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover { background: #1D4ED8; }
+    .note {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 12px;
+      padding: 16px 20px;
+      max-width: 700px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #1D4ED8;
+    }
+    .note strong { color: #1E40AF; }
+  </style>
+</head>
+<body>
+
+<h1>Generador de íconos — PresúFácil</h1>
+<p>Abrí este archivo en Chrome o Edge, generá los PNG y reemplazá los archivos en la carpeta <code>assets/</code></p>
+
+<div class="note">
+  <strong>Instrucciones:</strong><br>
+  1. Hacé clic en <strong>"Descargar"</strong> para cada archivo.<br>
+  2. Renombrá y mové cada PNG a la carpeta <strong>assets/</strong> del proyecto.<br>
+  3. Para ver los cambios en el dispositivo: <code>npx expo start --clear</code> (en desarrollo) o <code>eas build</code> (para APK/IPA).
+</div>
+
+<div class="grid">
+  <!-- icon.png -->
+  <div class="card">
+    <h2>icon.png</h2>
+    <p>Ícono principal · 1024×1024 px<br>iOS + Android (fallback)</p>
+    <canvas id="canvas-icon" width="1024" height="1024" style="width:180px;height:180px;"></canvas>
+    <button onclick="download('canvas-icon','icon.png')">Descargar icon.png</button>
+  </div>
+
+  <!-- android-icon-foreground.png -->
+  <div class="card">
+    <h2>android-icon-foreground.png</h2>
+    <p>Foreground adaptativo Android · 1024×1024 px<br>Fondo transparente, ícono centrado al 66%</p>
+    <canvas id="canvas-fg" width="1024" height="1024" style="width:180px;height:180px;background:#E2E8F0;border-radius:50%"></canvas>
+    <button onclick="download('canvas-fg','android-icon-foreground.png')">Descargar foreground</button>
+  </div>
+
+  <!-- android-icon-background.png -->
+  <div class="card">
+    <h2>android-icon-background.png</h2>
+    <p>Background adaptativo Android · 1024×1024 px<br>Color sólido del fondo</p>
+    <canvas id="canvas-bg" width="1024" height="1024" style="width:180px;height:180px;"></canvas>
+    <button onclick="download('canvas-bg','android-icon-background.png')">Descargar background</button>
+  </div>
+
+  <!-- android-icon-monochrome.png -->
+  <div class="card">
+    <h2>android-icon-monochrome.png</h2>
+    <p>Monocromo Android · 1024×1024 px<br>Blanco sobre transparente</p>
+    <canvas id="canvas-mono" width="1024" height="1024" style="width:180px;height:180px;background:#64748B;border-radius:8px"></canvas>
+    <button onclick="download('canvas-mono','android-icon-monochrome.png')">Descargar monochrome</button>
+  </div>
+
+  <!-- splash-icon.png -->
+  <div class="card">
+    <h2>splash-icon.png</h2>
+    <p>Ícono del splash screen · 512×512 px<br>Sobre fondo azul</p>
+    <canvas id="canvas-splash" width="512" height="512" style="width:180px;height:180px;border-radius:16px"></canvas>
+    <button onclick="download('canvas-splash','splash-icon.png')">Descargar splash-icon.png</button>
+  </div>
+
+  <!-- favicon.png -->
+  <div class="card">
+    <h2>favicon.png</h2>
+    <p>Favicon web · 64×64 px</p>
+    <canvas id="canvas-fav" width="64" height="64" style="width:64px;height:64px;"></canvas>
+    <button onclick="download('canvas-fav','favicon.png')">Descargar favicon.png</button>
+  </div>
+</div>
+
+<script>
+const SVG_PATH = '../assets/icon.svg';
+
+function loadSVG() {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = SVG_PATH;
+  });
+}
+
+function drawIcon(ctx, img, size, opts = {}) {
+  const { scale = 1, offsetX = 0, offsetY = 0, bgColor = null, transparent = false, monoWhite = false } = opts;
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, size, size);
+  } else if (!transparent) {
+    ctx.clearRect(0, 0, size, size);
+  }
+
+  const drawSize = size * scale;
+  const x = (size - drawSize) / 2 + offsetX;
+  const y = (size - drawSize) / 2 + offsetY;
+  ctx.drawImage(img, x, y, drawSize, drawSize);
+
+  if (monoWhite) {
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+async function init() {
+  try {
+    const img = await loadSVG();
+
+    // icon.png — 1024×1024, full icon with background
+    const ctxIcon = document.getElementById('canvas-icon').getContext('2d');
+    drawIcon(ctxIcon, img, 1024, { scale: 1 });
+
+    // android foreground — icon centered within 66% safe zone, transparent bg
+    const ctxFg = document.getElementById('canvas-fg').getContext('2d');
+    drawIcon(ctxFg, img, 1024, { scale: 0.65, transparent: true });
+
+    // android background — solid gradient matching the icon bg
+    const ctxBg = document.getElementById('canvas-bg').getContext('2d');
+    const grad = ctxBg.createLinearGradient(0, 0, 1024, 1024);
+    grad.addColorStop(0, '#3B82F6');
+    grad.addColorStop(1, '#1D4ED8');
+    ctxBg.fillStyle = grad;
+    ctxBg.fillRect(0, 0, 1024, 1024);
+
+    // android monochrome — icon in white on transparent
+    const ctxMono = document.getElementById('canvas-mono').getContext('2d');
+    drawIcon(ctxMono, img, 1024, { scale: 0.65, transparent: true, monoWhite: true });
+
+    // splash — 512×512 full icon
+    const ctxSplash = document.getElementById('canvas-splash').getContext('2d');
+    drawIcon(ctxSplash, img, 512, { scale: 1 });
+
+    // favicon — 64×64
+    const ctxFav = document.getElementById('canvas-fav').getContext('2d');
+    drawIcon(ctxFav, img, 64, { scale: 1 });
+
+  } catch (e) {
+    alert('No se pudo cargar el SVG. Asegurate de abrir este archivo desde un servidor local o desde la misma carpeta que el proyecto.\n\nPodés correr: npx serve . en la raíz del proyecto y abrir http://localhost:3000/scripts/generate-icons.html');
+    console.error(e);
+  }
+}
+
+function download(canvasId, filename) {
+  const canvas = document.getElementById(canvasId);
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -54,15 +54,14 @@ export default function BusinessProfileScreen({ navigation }) {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text variant="titleLarge" style={styles.headerTitle}>
-          Mi negocio
-        </Text>
+        <Text style={styles.headerTitle}>Mi negocio</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -83,10 +82,7 @@ export default function BusinessProfileScreen({ navigation }) {
                   />
                 </View>
               )}
-              <Text
-                variant="labelLarge"
-                style={{ color: theme.colors.primary, marginTop: 10 }}
-              >
+              <Text style={[styles.logoAction, { color: theme.colors.primary }]}>
                 {logoUri ? 'Cambiar logo' : 'Agregar logo (opcional)'}
               </Text>
             </TouchableOpacity>
@@ -106,18 +102,14 @@ export default function BusinessProfileScreen({ navigation }) {
                 }
               >
                 <MaterialCommunityIcons name="trash-can-outline" size={15} color={colors.error} />
-                <Text variant="labelMedium" style={styles.deleteLogoText}>
-                  Eliminar logo
-                </Text>
+                <Text style={styles.deleteLogoText}>Eliminar logo</Text>
               </TouchableOpacity>
             ) : null}
           </View>
 
           {/* Sección: Datos básicos */}
           <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              TU NEGOCIO
-            </Text>
+            <Text style={styles.sectionLabel}>TU NEGOCIO</Text>
 
             <AppInput
               label="Nombre completo *"
@@ -155,9 +147,7 @@ export default function BusinessProfileScreen({ navigation }) {
 
           {/* Sección: Contacto */}
           <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              CONTACTO
-            </Text>
+            <Text style={styles.sectionLabel}>CONTACTO</Text>
 
             <AppInput
               label="WhatsApp *"
@@ -193,14 +183,10 @@ export default function BusinessProfileScreen({ navigation }) {
 
           {/* Sección: Presupuestos */}
           <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              PRESUPUESTOS
-            </Text>
+            <Text style={styles.sectionLabel}>PRESUPUESTOS</Text>
 
             <View style={styles.validityContainer}>
-              <Text variant="bodyMedium" style={styles.validityLabel}>
-                Validez del presupuesto
-              </Text>
+              <Text style={styles.validityLabel}>Validez del presupuesto</Text>
               <SegmentedButtons
                 value={String(form.validityDays)}
                 onValueChange={v => updateField('validityDays', Number(v))}
@@ -224,7 +210,6 @@ export default function BusinessProfileScreen({ navigation }) {
             />
           </View>
 
-          {/* Botón guardar */}
           <AppButton onPress={handleSave} loading={loading}>
             Guardar cambios
           </AppButton>
@@ -253,6 +238,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text,
   },
@@ -260,9 +246,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 32,
     gap: 24,
   },
+
+  // Logo
   logoArea: {
     alignItems: 'center',
     paddingVertical: 8,
@@ -270,6 +258,28 @@ const styles = StyleSheet.create({
   },
   logoTouchable: {
     alignItems: 'center',
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: colors.primaryLight,
+  },
+  logoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceVariant,
+  },
+  logoAction: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
   },
   deleteLogoBtn: {
     flexDirection: 'row',
@@ -282,41 +292,37 @@ const styles = StyleSheet.create({
     borderColor: colors.error,
   },
   deleteLogoText: {
+    fontSize: 13,
     color: colors.error,
+    fontWeight: '500',
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceVariant,
-  },
-  logoImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-  },
+
+  // Secciones
   section: {
     gap: 14,
   },
   sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textSecondary,
-    letterSpacing: 0.8,
-    marginBottom: 2,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
+
+  // Validez
   validityContainer: {
     gap: 10,
   },
   validityLabel: {
-    color: colors.text,
+    fontSize: 14,
     fontWeight: '500',
+    color: colors.text,
   },
   segmented: {
     borderRadius: 12,
   },
+
+  // Campo bloqueado (rubro)
   lockedField: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -340,4 +346,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
+
 });

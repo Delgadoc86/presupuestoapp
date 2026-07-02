@@ -10,23 +10,26 @@ import { AuthProvider } from './src/context/AuthContext';
 import { BusinessProvider } from './src/context/BusinessContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import AppSnackbar from './src/components/common/AppSnackbar';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <PaperProvider theme={theme}>
-          <AppProvider>
-            <AuthProvider>
-              <BusinessProvider>
-                <StatusBar style="auto" />
-                <AppNavigator />
-                <AppSnackbar />
-              </BusinessProvider>
-            </AuthProvider>
-          </AppProvider>
-        </PaperProvider>
-      </SafeAreaProvider>
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <PaperProvider theme={theme}>
+            <AppProvider>
+              <AuthProvider>
+                <BusinessProvider>
+                  <StatusBar style="auto" />
+                  <AppNavigator />
+                  <AppSnackbar />
+                </BusinessProvider>
+              </AuthProvider>
+            </AppProvider>
+          </PaperProvider>
+        </SafeAreaProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

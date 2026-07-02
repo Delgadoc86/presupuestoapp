@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getDocs } from 'firebase/firestore';
 import { useAuthContext } from '../context/AuthContext';
 import { buildHistoryQuery, PAGE_SIZE } from '../services/quotes.service';
+import { logError } from '../utils/errorUtils';
 
 export function useHistoryQuotes({ statusFilter = null, dateFilter = null } = {}) {
   const { user } = useAuthContext();
@@ -50,7 +51,7 @@ export function useHistoryQuotes({ statusFilter = null, dateFilter = null } = {}
       setQuotes(docs);
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (e) {
-      console.error('[useHistoryQuotes]', e);
+      logError('useHistoryQuotes', e);
       setQuotes([]);
       setHasMore(false);
     } finally {
@@ -75,7 +76,7 @@ export function useHistoryQuotes({ statusFilter = null, dateFilter = null } = {}
       setQuotes(prev => [...prev, ...docs]);
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (e) {
-      console.error('[useHistoryQuotes loadMore]', e);
+      logError('useHistoryQuotes loadMore', e);
     } finally {
       setLoadingMore(false);
     }

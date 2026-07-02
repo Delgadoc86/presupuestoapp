@@ -5,57 +5,49 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import QuoteStatusBadge from './QuoteStatusBadge';
 import { formatCurrency, formatDate, formatQuoteNumber } from '../../utils/formatters';
 import { colors } from '../../theme/colors';
+import { QUOTE_STATUS_COLOR, QUOTE_STATUS_BG_COLOR } from '../../utils/constants';
+
+function ClientAvatar({ name, status }) {
+  const initial  = (name ?? '?')[0].toUpperCase();
+  const color    = QUOTE_STATUS_COLOR[status]    ?? colors.primary;
+  const bg       = QUOTE_STATUS_BG_COLOR[status] ?? colors.primaryLight;
+  return (
+    <View style={[styles.avatar, { backgroundColor: bg }]}>
+      <Text style={[styles.avatarText, { color }]}>{initial}</Text>
+    </View>
+  );
+}
 
 export default function QuoteCard({ quote, onPress, onOptions }) {
   const clientName = quote.client?.name ?? 'Sin cliente';
-  const clientPhone = quote.client?.phone;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
       <Surface style={styles.card} elevation={1}>
-        {/* Fila superior: número + badge + opciones */}
-        <View style={styles.topRow}>
-          <Text variant="labelMedium" style={styles.number}>
-            {formatQuoteNumber(quote.quoteNumber)}
-          </Text>
-          <View style={styles.topRight}>
-            <QuoteStatusBadge status={quote.status} />
-            {!!onOptions && (
-              <TouchableOpacity
-                onPress={onOptions}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.optionsBtn}
-              >
-                <MaterialCommunityIcons
-                  name="dots-vertical"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+        <View style={styles.row}>
+          <ClientAvatar name={clientName} status={quote.status} />
 
-        {/* Nombre del cliente */}
-        <Text variant="titleSmall" style={styles.clientName} numberOfLines={1}>
-          {clientName}
-        </Text>
-
-        {/* Fila inferior: fecha (+ teléfono si existe) + total */}
-        <View style={styles.bottomRow}>
-          <View style={styles.metaLeft}>
-            <Text variant="bodySmall" style={styles.date}>
-              {formatDate(quote.createdAt)}
+          <View style={styles.content}>
+            <Text style={styles.clientName} numberOfLines={1}>{clientName}</Text>
+            <Text style={styles.meta}>
+              {formatQuoteNumber(quote.quoteNumber)} · {formatDate(quote.createdAt)}
             </Text>
-            {!!clientPhone && (
-              <Text variant="bodySmall" style={styles.phone} numberOfLines={1}>
-                · {clientPhone}
-              </Text>
-            )}
           </View>
-          <Text variant="titleSmall" style={styles.total}>
-            {formatCurrency(quote.total ?? 0)}
-          </Text>
+
+          <View style={styles.rightCol}>
+            <Text style={styles.total}>{formatCurrency(quote.total ?? 0)}</Text>
+            <QuoteStatusBadge status={quote.status} />
+          </View>
+
+          {!!onOptions && (
+            <TouchableOpacity
+              onPress={onOptions}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.optionsBtn}
+            >
+              <MaterialCommunityIcons name="dots-vertical" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
       </Surface>
     </TouchableOpacity>
@@ -65,54 +57,53 @@ export default function QuoteCard({ quote, onPress, onOptions }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    gap: 6,
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  topRight: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 12,
   },
-  optionsBtn: {
-    padding: 2,
-    marginLeft: 2,
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
-  number: {
-    color: colors.textSecondary,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+    gap: 3,
   },
   clientName: {
+    fontSize: 16,
     fontWeight: '600',
     color: colors.text,
   },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  meta: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
-  metaLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  rightCol: {
+    alignItems: 'flex-end',
     gap: 4,
-    flex: 1,
-    marginRight: 8,
-  },
-  date: {
-    color: colors.textSecondary,
-  },
-  phone: {
-    color: colors.textSecondary,
-    flexShrink: 1,
   },
   total: {
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.success,
+  },
+  optionsBtn: {
+    padding: 4,
   },
 });

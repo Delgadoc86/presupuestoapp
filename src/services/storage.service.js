@@ -1,5 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../../firebase.config';
+import { logError } from '../utils/errorUtils';
 
 /**
  * Sube el logo del negocio a Firebase Storage y retorna la URL pública.
@@ -31,7 +32,7 @@ export async function uploadLogo(userId, localUri) {
     const downloadUrl = await getDownloadURL(snapshot.ref);
     return downloadUrl;
   } catch (error) {
-    console.error('Error subiendo logo a Firebase Storage:', error);
+    logError('uploadLogo', error);
     throw error;
   } finally {
     // blob.close() es una API específica de React Native (no existe en Web).
@@ -53,6 +54,6 @@ export async function uploadLogo(userId, localUri) {
 export async function deleteLogo(userId) {
   const logoRef = ref(storage, `logos/${userId}/logo.jpg`);
   await deleteObject(logoRef).catch((error) => {
-    console.warn('Error eliminando logo de Storage:', error);
+    logError('deleteLogo', error);
   });
 }

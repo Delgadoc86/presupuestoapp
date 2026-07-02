@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { useAuthContext } from '../context/AuthContext';
 import { getQuotesQuery } from '../services/quotes.service';
+import { logError } from '../utils/errorUtils';
 
 export function useQuotes() {
   const { user } = useAuthContext();
@@ -39,7 +40,7 @@ export function useQuotes() {
         setLoading(false);
       },
       (error) => {
-        console.error('Error cargando presupuestos:', error);
+        logError('useQuotes', error);
         setLoading(false);
       }
     );

@@ -20,6 +20,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 import { useAuthContext } from './AuthContext';
+import { logError } from '../utils/errorUtils';
 
 const BusinessContext = createContext(null);
 
@@ -42,7 +43,7 @@ export function BusinessProvider({ children }) {
         setLoading(false);
       },
       (error) => {
-        console.error('Error escuchando perfil del negocio:', error);
+        logError('BusinessContext', error);
         setLoading(false);
       }
     );

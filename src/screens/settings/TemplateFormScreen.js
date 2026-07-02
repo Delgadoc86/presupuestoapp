@@ -23,6 +23,7 @@ import { createTemplate, updateTemplate } from '../../services/templates.service
 import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { useAppContext } from '../../context/AppContext';
+import { logError } from '../../utils/errorUtils';
 import { colors } from '../../theme/colors';
 
 function generateItemId() {
@@ -143,7 +144,7 @@ export default function TemplateFormScreen({ navigation, route }) {
       }
       navigation.goBack();
     } catch (error) {
-      console.error('Error guardando plantilla:', error);
+      logError('TemplateFormScreen', error);
       showSnackbar('No se pudo guardar la plantilla. Revisá tu conexión.', 'error');
     } finally {
       setLoading(false);

@@ -19,6 +19,7 @@ import { deleteTemplate, restoreDefaultTemplate } from '../../services/templates
 import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { useAppContext } from '../../context/AppContext';
+import { logError } from '../../utils/errorUtils';
 import { colors } from '../../theme/colors';
 
 export default function TemplateListScreen({ navigation }) {
@@ -55,7 +56,7 @@ export default function TemplateListScreen({ navigation }) {
       await restoreDefaultTemplate(user.uid, business?.sector ?? '');
       showSnackbar('Plantilla base restaurada', 'success');
     } catch (error) {
-      console.error('Error restaurando plantilla base:', error);
+      logError('TemplateListScreen restore', error);
       showSnackbar('No se pudo restaurar la plantilla', 'error');
     } finally {
       setRestoring(false);

@@ -331,8 +331,8 @@ export default function HistoryScreen({ navigation }) {
   function renderEmpty() {
     if (loading) return null;
 
-    let title = 'Todavía no hay presupuestos';
-    let sub   = 'Creá tu primer presupuesto desde la pestaña Presupuesto';
+    let title = 'Todavía no tenés presupuestos';
+    let sub   = '¡Creá el primero desde la pestaña Presupuesto!';
 
     if (searchText.trim()) {
       title = 'Sin coincidencias en los resultados cargados';
@@ -404,8 +404,8 @@ export default function HistoryScreen({ navigation }) {
           onChangeText={setSearchText}
           mode="outlined"
           dense
-          placeholder="Buscar por cliente, número, teléfono..."
-          left={<TextInput.Icon icon="magnify" color={colors.textSecondary} />}
+          placeholder="Buscar cliente o monto..."
+          left={<TextInput.Icon icon="magnify" color={colors.primary} />}
           right={
             searchText
               ? <TextInput.Icon icon="close" onPress={() => setSearchText('')} color={colors.textSecondary} />
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
   // Búsqueda
   searchWrapper: { paddingHorizontal: 20, marginBottom: 10 },
   searchInput:   { backgroundColor: colors.surface, fontSize: 14 },
-  searchOutline: { borderRadius: 12 },
+  searchOutline: { borderRadius: 16, borderColor: colors.border },
 
   // ── Barra de filtros compacta ──
   filterBar: {

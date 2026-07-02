@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { TextInput, Text, Surface } from 'react-native-paper';
+import { TextInput, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatCurrency } from '../../utils/formatters';
 import { colors } from '../../theme/colors';
 
+const inputOutlineStyle = { borderRadius: 8 };
+
 export default function QuoteItemRow({ item, index, onChange, onDelete }) {
   return (
-    <Surface style={styles.card} elevation={0}>
+    <View style={styles.card}>
       {/* Fila 1: descripción + eliminar */}
       <View style={styles.row1}>
         <TextInput
@@ -15,9 +17,11 @@ export default function QuoteItemRow({ item, index, onChange, onDelete }) {
           onChangeText={v => onChange('description', v)}
           mode="outlined"
           dense
-          placeholder={`Ítem ${index + 1}`}
+          placeholder={`Descripción del ítem ${index + 1}`}
+          outlineColor={colors.border}
+          activeOutlineColor={colors.primary}
+          outlineStyle={inputOutlineStyle}
           style={styles.descInput}
-          outlineStyle={styles.outline}
           autoCapitalize="sentences"
         />
         <TouchableOpacity
@@ -31,48 +35,48 @@ export default function QuoteItemRow({ item, index, onChange, onDelete }) {
 
       {/* Fila 2: cantidad × precio = subtotal */}
       <View style={styles.row2}>
-        <View style={styles.quantityWrapper}>
-          <Text variant="bodySmall" style={styles.fieldLabel}>
-            Cant.
-          </Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Cant.</Text>
           <TextInput
             value={String(item.quantity)}
             onChangeText={v => onChange('quantity', v)}
             mode="outlined"
             dense
             keyboardType="numeric"
+            selectTextOnFocus
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+            outlineStyle={inputOutlineStyle}
             style={styles.smallInput}
-            outlineStyle={styles.outline}
           />
         </View>
 
         <Text style={styles.operator}>×</Text>
 
-        <View style={styles.priceWrapper}>
-          <Text variant="bodySmall" style={styles.fieldLabel}>
-            Precio unit.
-          </Text>
+        <View style={[styles.fieldGroup, { flex: 1 }]}>
+          <Text style={styles.fieldLabel}>Precio unit.</Text>
           <TextInput
             value={String(item.unitPrice)}
             onChangeText={v => onChange('unitPrice', v)}
             mode="outlined"
             dense
             keyboardType="numeric"
+            selectTextOnFocus
+            outlineColor={colors.border}
+            activeOutlineColor={colors.primary}
+            outlineStyle={inputOutlineStyle}
             style={styles.priceInput}
-            outlineStyle={styles.outline}
           />
         </View>
 
-        <View style={styles.subtotalWrapper}>
-          <Text variant="bodySmall" style={styles.fieldLabel}>
-            Subtotal
-          </Text>
-          <Text variant="bodyMedium" style={styles.subtotal}>
+        <View style={styles.subtotalGroup}>
+          <Text style={styles.fieldLabel}>Subtotal</Text>
+          <Text style={styles.subtotalValue}>
             {formatCurrency(item.subtotal ?? 0)}
           </Text>
         </View>
       </View>
-    </Surface>
+    </View>
   );
 }
 
@@ -80,10 +84,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 14,
-    padding: 12,
+    padding: 14,
     gap: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   row1: {
     flexDirection: 'row',
@@ -103,37 +110,39 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
   },
+  fieldGroup: {
+    gap: 3,
+  },
   fieldLabel: {
-    color: colors.textSecondary,
-    marginBottom: 3,
-  },
-  quantityWrapper: {
-    width: 64,
-  },
-  priceWrapper: {
-    flex: 1,
-  },
-  subtotalWrapper: {
-    alignItems: 'flex-end',
-    minWidth: 80,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginLeft: 2,
   },
   smallInput: {
+    width: 64,
     backgroundColor: colors.surface,
   },
   priceInput: {
     backgroundColor: colors.surface,
   },
   operator: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    marginBottom: 8,
+    color: colors.textMuted,
+    fontSize: 16,
+    marginBottom: 10,
   },
-  subtotal: {
+  subtotalGroup: {
+    alignItems: 'flex-end',
+    gap: 3,
+    minWidth: 88,
+    paddingBottom: 2,
+  },
+  subtotalValue: {
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.success,
     marginBottom: 8,
-  },
-  outline: {
-    borderRadius: 8,
   },
 });

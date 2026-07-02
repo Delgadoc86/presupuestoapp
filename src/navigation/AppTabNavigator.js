@@ -29,10 +29,10 @@
  *   el botón "volver" lleve al historial y no al formulario.
  */
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/home/HomeScreen';
@@ -46,11 +46,21 @@ import TemplateFormScreen from '../screens/settings/TemplateFormScreen';
 import AccountScreen from '../screens/settings/AccountScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
+import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
 const QuoteStack = createStackNavigator();
 const HistoryStack = createStackNavigator();
 const SettingsStack = createStackNavigator();
+
+function TabIcon({ name, color, focused }) {
+  return (
+    <View style={styles.tabIconWrapper}>
+      <MaterialCommunityIcons name={name} size={24} color={color} />
+      {focused && <View style={styles.tabIndicator} />}
+    </View>
+  );
+}
 
 function QuoteNavigator() {
   return (
@@ -86,26 +96,31 @@ function SettingsNavigator() {
 }
 
 export default function AppTabNavigator() {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: '#868E96',
+        tabBarActiveTintColor:   colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#DEE2E6',
+          borderTopColor: colors.border,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 8,
-          height: 64 + insets.bottom,
+          height: 64 + (insets.bottom > 0 ? insets.bottom : 0),
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
         },
       }}
     >
@@ -114,8 +129,8 @@ export default function AppTabNavigator() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Inicio',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="home-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -124,8 +139,8 @@ export default function AppTabNavigator() {
         component={QuoteNavigator}
         options={{
           tabBarLabel: 'Presupuesto',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="plus-circle-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="plus-circle-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -134,8 +149,8 @@ export default function AppTabNavigator() {
         component={HistoryNavigator}
         options={{
           tabBarLabel: 'Historial',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clipboard-list-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="clipboard-list-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -144,11 +159,24 @@ export default function AppTabNavigator() {
         component={SettingsNavigator}
         options={{
           tabBarLabel: 'Ajustes',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="cog-outline" color={color} focused={focused} />
           ),
         }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIconWrapper: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  tabIndicator: {
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+});

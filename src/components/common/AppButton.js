@@ -29,14 +29,14 @@ export default function AppButton({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 12,
+    borderRadius: 50,
   },
   content: {
-    height: 52,
+    height: 54,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });
