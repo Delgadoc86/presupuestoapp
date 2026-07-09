@@ -123,6 +123,19 @@ export default function AdminDashboardScreen({ navigation }) {
           </Text>
           <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
         </TouchableOpacity>
+
+        {/* Botón de acceso a configuración de actualización */}
+        <TouchableOpacity
+          style={[styles.usersBtn, styles.updateBtn]}
+          onPress={() => navigation.navigate('AdminUpdateConfig')}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="cellphone-arrow-down" size={22} color="#fff" />
+          <Text variant="labelLarge" style={styles.usersBtnText}>
+            Configurar actualización
+          </Text>
+          <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -216,5 +229,8 @@ const styles = StyleSheet.create({
   usersBtnText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  updateBtn: {
+    backgroundColor: '#7C3AED',
   },
 });

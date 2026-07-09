@@ -46,6 +46,7 @@ import TemplateFormScreen from '../screens/settings/TemplateFormScreen';
 import AccountScreen from '../screens/settings/AccountScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
+import AdminUpdateConfigScreen from '../screens/admin/AdminUpdateConfigScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -91,6 +92,7 @@ function SettingsNavigator() {
       <SettingsStack.Screen name="Account" component={AccountScreen} />
       <SettingsStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       <SettingsStack.Screen name="AdminUsers" component={AdminUsersScreen} />
+      <SettingsStack.Screen name="AdminUpdateConfig" component={AdminUpdateConfigScreen} />
     </SettingsStack.Navigator>
   );
 }

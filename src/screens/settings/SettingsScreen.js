@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Application from 'expo-application';
 import { colors } from '../../theme/colors';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { openSupportEmail, openUpgradeEmail } from '../../utils/contactHelper';
@@ -108,7 +109,9 @@ export default function SettingsScreen({ navigation }) {
           </Surface>
         </View>
 
-        <Text style={styles.version}>v{APP_CONFIG.version ?? '1.0.6'}</Text>
+        <Text style={styles.version}>
+          Versión de la app: {Application.nativeApplicationVersion ?? APP_CONFIG.version}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );

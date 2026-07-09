@@ -10,6 +10,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { BusinessProvider } from './src/context/BusinessContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import AppSnackbar from './src/components/common/AppSnackbar';
+import UpdateModal from './src/components/common/UpdateModal';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
                   <StatusBar style="auto" />
                   <AppNavigator />
                   <AppSnackbar />
+                  <UpdateModal />
                 </BusinessProvider>
               </AuthProvider>
             </AppProvider>

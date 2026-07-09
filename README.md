@@ -7,6 +7,24 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.7 (2026-07-08)
+
+**Sistema de aviso de actualización de la app:**
+
+- Nueva pantalla `AdminUpdateConfigScreen` (Panel Admin → "Configurar actualización"): permite activar/desactivar el aviso, definir la última versión disponible (`X.X.X`), título, mensaje y URL de descarga. Guarda en `appConfig/updateInfo` en Firestore.
+- `useAppUpdateCheck` hook: al montar la app, lee `appConfig/updateInfo` y compara la versión instalada (`expo-application` → `Application.nativeApplicationVersion`, versión real del binario nativo) contra `latestVersion` con `compareVersions()` / `isVersionOutdated()` (`src/utils/versionUtils.js`, comparación numérica por componente, no lexicográfica).
+- `UpdateModal`, montado globalmente en `App.js`, muestra un diálogo no descartable por fuera (`dismissable={false}`) con botón "Actualizar ahora" (abre `downloadUrl`) y "Ahora no" (lo oculta hasta la próxima apertura de la app).
+- `SettingsScreen` ahora muestra la versión real del binario instalado (`Application.nativeApplicationVersion`) en vez del valor estático de `APP_CONFIG.version`.
+- Nueva dependencia: `expo-application`.
+- **Limitación conocida:** `Application.nativeApplicationVersion` devuelve la versión de **Expo Go** cuando se prueba con `npx expo start` (ej. `54.0.8`), no la versión configurada en `app.json`. El aviso de actualización y el número mostrado en Ajustes solo reflejan la versión real de PresúFácil en un build nativo (EAS Build / instalación desde Play Store), no en Expo Go.
+
+**Firestore:**
+
+- Nueva colección `appConfig/{docId}`: lectura pública (`allow read: if true`, necesaria para chequear actualizaciones antes de iniciar sesión), escritura solo admin.
+- Agregados `firebase.json` y `.firebaserc` (apuntando al proyecto `presupuesto-7d9e2`) para poder desplegar reglas con `firebase deploy --only firestore:rules` — antes no existían en el repo.
+
+---
+
 ### v1.0.6 (2026-07-01)
 
 **Rediseño visual completo (UI/UX):**
@@ -219,7 +237,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Plantillas | Ítems predefinidos reutilizables con 30+ plantillas base por rubro; CRUD completo con reordenamiento |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
 | Sistema Demo/Pro | Cuota mensual para Demo, planes Pro con fecha de vencimiento, banner de estado en Inicio |
-| Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio/UID |
+| Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio/UID, configuración del aviso de actualización |
+| Aviso de actualización | Modal in-app cuando hay una versión nueva disponible (comparación semver contra `appConfig/updateInfo` en Firestore), configurable desde el Panel Admin |
 | Estabilidad | ErrorBoundary global, logError() centralizado (solo activo en desarrollo), expo-doctor 18/18 ✓ |
 
 ---
@@ -235,6 +254,7 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 - **expo-print** — generación de PDF desde HTML e impresión
 - **expo-sharing** — compartición de archivos via share sheet del sistema
 - **expo-file-system** (legacy) — copia y gestión de archivos locales
+- **expo-application** — versión real del binario nativo instalado (aviso de actualización)
 - **EAS Build** — builds de APK/AAB en la nube
 
 ---
@@ -369,9 +389,18 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if false;
     }
+
+    // Info no sensible (versión mínima, aviso de actualización). Lectura pública
+    // para poder chequear actualizaciones incluso antes de iniciar sesión.
+    match /appConfig/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
   }
 }
 ```
+
+> Las reglas activas se versionan en `firestore.rules` y se despliegan con `firebase deploy --only firestore:rules` (requiere `firebase.json` y `.firebaserc` en la raíz, apuntando al proyecto `presupuesto-7d9e2`).
 
 ---
 
@@ -428,12 +457,12 @@ presupuestoapp/
 ├── assets/                  # Íconos y recursos visuales
 ├── src/
 │   ├── components/          # Componentes reutilizables
-│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar, EmptyState, ErrorBoundary
+│   │   ├── common/          # AppButton, AppInput, AppLoader, AppSnackbar, EmptyState, ErrorBoundary, UpdateModal
 │   │   ├── quotes/          # QuoteCard, QuoteItemRow, QuoteStatusBadge, QuoteTotalsCard
 │   │   └── templates/       # TemplateItemRow
 │   ├── context/             # AuthContext, BusinessContext, AppContext
 │   ├── data/                # defaultTemplates (plantillas predefinidas)
-│   ├── hooks/               # useBusiness, useQuotes, useHistoryQuotes, useTemplates, useIsAdmin, useAdminUsers
+│   ├── hooks/               # useBusiness, useQuotes, useHistoryQuotes, useTemplates, useIsAdmin, useAdminUsers, useAppUpdateCheck
 │   ├── navigation/          # AppNavigator, AppTabNavigator, AuthNavigator
 │   ├── screens/             # Pantallas agrupadas por módulo
 │   │   ├── auth/            # Login, Register, ForgotPassword
@@ -442,18 +471,22 @@ presupuestoapp/
 │   │   ├── onboarding/      # BusinessSetupScreen
 │   │   ├── quotes/          # QuoteDetailScreen, QuoteFormScreen
 │   │   ├── settings/        # Settings, BusinessProfile, Account, Templates
-│   │   └── admin/           # AdminDashboardScreen, AdminUsersScreen
+│   │   └── admin/           # AdminDashboardScreen, AdminUsersScreen, AdminUpdateConfigScreen
 │   ├── services/            # Lógica de Firebase y funciones de negocio
 │   │   ├── auth.service.js
 │   │   ├── business.service.js
+│   │   ├── appUpdate.service.js  # Lectura/escritura de appConfig/updateInfo
 │   │   ├── pdf.service.js   # Generación, compartición e impresión de PDF
 │   │   ├── quotes.service.js
 │   │   ├── storage.service.js
 │   │   └── templates.service.js
 │   ├── theme/               # Colores y tema Material Design
-│   └── utils/               # Constantes (SECTOR_OPTIONS), formateadores, plantilla HTML del PDF, planStatus, contactHelper
+│   └── utils/               # Constantes (SECTOR_OPTIONS), formateadores, plantilla HTML del PDF, planStatus, contactHelper, versionUtils
 ├── App.js                   # Punto de entrada
 ├── firebase.config.js       # Configuración Firebase
+├── firebase.json            # Config del Firebase CLI (deploy de reglas)
+├── .firebaserc              # Proyecto Firebase por defecto (presupuesto-7d9e2)
+├── firestore.rules          # Reglas de seguridad de Firestore (versionadas)
 ├── google-services.json     # Configuración Firebase para Android nativo
 ├── babel.config.js
 ├── eas.json                 # Perfiles de build (preview APK / production AAB)
