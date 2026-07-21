@@ -14,7 +14,6 @@ import {
   Button,
   Dialog,
   Portal,
-  RadioButton,
   TextInput,
 } from 'react-native-paper';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +28,7 @@ import {
   duplicateQuote,
   updateQuoteStatus,
 } from '../../services/quotes.service';
+import { getStatusActions, NEEDS_FOLLOWUP_STATUSES } from '../../utils/quoteStatus';
 import { useHistoryQuotes } from '../../hooks/useHistoryQuotes';
 import { useAuthContext } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
@@ -50,6 +50,7 @@ const STATUS_OPTIONS = [
   { key: QUOTE_STATUS.SENT,     label: 'Enviados',   color: QUOTE_STATUS_COLOR.sent     },
   { key: QUOTE_STATUS.ACCEPTED, label: 'Aceptados',  color: QUOTE_STATUS_COLOR.accepted },
   { key: QUOTE_STATUS.REJECTED, label: 'Rechazados', color: QUOTE_STATUS_COLOR.rejected },
+  { key: QUOTE_STATUS.EXPIRED,  label: 'Vencidos',   color: QUOTE_STATUS_COLOR.expired  },
   { key: QUOTE_STATUS.PAID,     label: 'Pagados',    color: QUOTE_STATUS_COLOR.paid     },
 ];
 
@@ -61,20 +62,17 @@ const DATE_OPTIONS = [
   { key: 'year',   label: 'Este año'           },
 ];
 
-// Usado solo por el dialog de cambio de estado (sin cambios)
-const STATUS_ORDER = [
-  QUOTE_STATUS.DRAFT,
-  QUOTE_STATUS.SENT,
-  QUOTE_STATUS.ACCEPTED,
-  QUOTE_STATUS.REJECTED,
-  QUOTE_STATUS.PAID,
-];
-
 // ── Helpers de etiquetas para los pills de la barra ─────────────────────────
 
 function getStatusPillLabel(key) {
   if (!key) return 'Todos';
+  if (Array.isArray(key)) return 'Necesitan seguimiento';
   return QUOTE_STATUS_LABEL[key] ?? 'Todos';
+}
+
+function matchesStatusFilter(status, statusFilter) {
+  if (!statusFilter) return true;
+  return Array.isArray(statusFilter) ? statusFilter.includes(status) : status === statusFilter;
 }
 
 function getDatePillLabel(key) {
@@ -136,10 +134,11 @@ export default function HistoryScreen({ navigation }) {
   const [tempStatus,  setTempStatus]  = useState(null);
   const [tempDate,    setTempDate]    = useState(null);
 
-  const [actionLoading,     setActionLoading]     = useState(false);
-  const [menuQuote,         setMenuQuote]         = useState(null);
-  const [statusDialogQuote, setStatusDialogQuote] = useState(null);
-  const [selectedStatus,    setSelectedStatus]    = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [menuQuote,     setMenuQuote]     = useState(null);
+  // { quote, to, label, message, muted? } | null — reemplaza el diálogo de
+  // radio libre: cada acción viene del menú, ya sabe a qué estado va.
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const {
     quotes,
@@ -185,11 +184,16 @@ export default function HistoryScreen({ navigation }) {
   );
 
   const activeFilterCount = (statusFilter !== null ? 1 : 0) + (dateFilter !== null ? 1 : 0);
+  const isNeedsFollowupActive = statusFilter === NEEDS_FOLLOWUP_STATUSES;
+
+  function toggleNeedsFollowup() {
+    setStatusFilter(prev => (prev === NEEDS_FOLLOWUP_STATUSES ? null : NEEDS_FOLLOWUP_STATUSES));
+  }
 
   // ── Modal de filtros ────────────────────────────────────────────────────
 
   function openFilterModal() {
-    setTempStatus(statusFilter);
+    setTempStatus(Array.isArray(statusFilter) ? null : statusFilter);
     setTempDate(dateFilter);
     setIsFilterModalVisible(true);
   }
@@ -255,28 +259,34 @@ export default function HistoryScreen({ navigation }) {
     }
   }
 
-  function handleOpenStatusDialog() {
+  // Acciones disponibles para el presupuesto del menú abierto — mismo origen
+  // (STATUS_ACTIONS en quoteStatus.js) que QuoteDetailScreen.
+  const menuStatusActions = menuQuote ? getStatusActions(menuQuote.status) : [];
+
+  function requestStatusChange(action) {
     const q = menuQuote; closeMenu();
-    setSelectedStatus(q.status);
-    setStatusDialogQuote(q);
+    setConfirmAction({ ...action, quote: q });
   }
 
-  async function handleStatusChange() {
-    if (selectedStatus === statusDialogQuote.status) { setStatusDialogQuote(null); return; }
-    const quoteId    = statusDialogQuote.id;
-    const newStatus  = selectedStatus;
-    setStatusDialogQuote(null);
+  async function confirmStatusChange() {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (!action) return;
     setActionLoading(true);
     try {
-      await updateQuoteStatus(quoteId, newStatus);
-      if (statusFilter && newStatus !== statusFilter) {
-        removeQuote(quoteId);
+      await updateQuoteStatus(action.quote.id, action.to);
+      if (!matchesStatusFilter(action.to, statusFilter)) {
+        removeQuote(action.quote.id);
       } else {
-        updateQuoteLocal(quoteId, { status: newStatus });
+        updateQuoteLocal(action.quote.id, { status: action.to });
       }
-      showSnackbar(`Estado cambiado a ${QUOTE_STATUS_LABEL[newStatus]}`, 'success');
-    } catch {
-      showSnackbar('No se pudo actualizar el estado', 'error');
+      showSnackbar(`Estado actualizado a ${QUOTE_STATUS_LABEL[action.to]}`, 'success');
+    } catch (error) {
+      if (error?.code === 'invalid_status_transition') {
+        showSnackbar('El estado cambió mientras tanto — actualizá la lista e intentá de nuevo.', 'error');
+      } else {
+        showSnackbar('No se pudo actualizar el estado', 'error');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -338,7 +348,7 @@ export default function HistoryScreen({ navigation }) {
       title = 'Sin coincidencias en los resultados cargados';
       sub   = 'Probá cargar más resultados o cambiar los filtros para ampliar la búsqueda.';
     } else if (activeFilterCount > 0) {
-      const statusLabel = statusFilter ? QUOTE_STATUS_LABEL[statusFilter]?.toLowerCase() : null;
+      const statusLabel = statusFilter ? getStatusPillLabel(statusFilter).toLowerCase() : null;
       title = statusLabel
         ? `No hay presupuestos ${statusLabel} en este período`
         : 'No hay presupuestos en este período';
@@ -382,7 +392,7 @@ export default function HistoryScreen({ navigation }) {
   }
 
   const countLabel = statusFilter
-    ? `${visibleCount} ${QUOTE_STATUS_LABEL[statusFilter]?.toLowerCase() ?? ''}`
+    ? `${visibleCount} ${getStatusPillLabel(statusFilter).toLowerCase()}`
     : `${visibleCount} presupuesto${visibleCount !== 1 ? 's' : ''}`;
 
   // ── JSX ─────────────────────────────────────────────────────────────────
@@ -416,30 +426,53 @@ export default function HistoryScreen({ navigation }) {
         />
       </View>
 
-      {/* Barra de filtros compacta — una sola fila */}
-      <View style={styles.filterBar}>
+      {/* Barra de filtros compacta — scrollea horizontal si no entra */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterBar}
+      >
+        {/* Pill: Necesitan seguimiento (enviados + vencidos, atajo de un toque) */}
+        <TouchableOpacity
+          style={[styles.filterPill, styles.filterPillFixed, isNeedsFollowupActive && styles.filterPillActive]}
+          onPress={toggleNeedsFollowup}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="clock-alert-outline"
+            size={15}
+            color={isNeedsFollowupActive ? '#fff' : colors.warning}
+          />
+          <Text
+            style={[styles.filterPillText, isNeedsFollowupActive && styles.filterPillTextActive]}
+            numberOfLines={1}
+          >
+            Necesitan seguimiento
+          </Text>
+        </TouchableOpacity>
+
         {/* Pill: Estado */}
         <TouchableOpacity
-          style={[styles.filterPill, statusFilter && styles.filterPillActive]}
+          style={[styles.filterPill, styles.filterPillFixed, statusFilter && !isNeedsFollowupActive && styles.filterPillActive]}
           onPress={openFilterModal}
           activeOpacity={0.7}
         >
           <Text
-            style={[styles.filterPillText, statusFilter && styles.filterPillTextActive]}
+            style={[styles.filterPillText, statusFilter && !isNeedsFollowupActive && styles.filterPillTextActive]}
             numberOfLines={1}
           >
-            Estado: {getStatusPillLabel(statusFilter)}
+            Estado: {isNeedsFollowupActive ? 'Todos' : getStatusPillLabel(statusFilter)}
           </Text>
           <MaterialCommunityIcons
             name="chevron-down"
             size={15}
-            color={statusFilter ? '#fff' : colors.textSecondary}
+            color={statusFilter && !isNeedsFollowupActive ? '#fff' : colors.textSecondary}
           />
         </TouchableOpacity>
 
         {/* Pill: Fecha */}
         <TouchableOpacity
-          style={[styles.filterPill, dateFilter && styles.filterPillActive]}
+          style={[styles.filterPill, styles.filterPillFixed, dateFilter && styles.filterPillActive]}
           onPress={openFilterModal}
           activeOpacity={0.7}
         >
@@ -469,7 +502,7 @@ export default function HistoryScreen({ navigation }) {
             </View>
           )}
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* Lista */}
       {loading ? (
@@ -584,7 +617,17 @@ export default function HistoryScreen({ navigation }) {
             <MenuOption icon="file-pdf-box"     color="#E03131"          label="Compartir PDF"  onPress={handleViewDetail}       />
             <MenuOption icon="pencil-outline"   color={colors.primary}   label="Editar"         onPress={handleEdit}             />
             <MenuOption icon="content-copy"     color={colors.secondary} label="Duplicar"       onPress={handleDuplicate}        />
-            <MenuOption icon="tag-outline"      color={colors.warning}   label="Cambiar estado" onPress={handleOpenStatusDialog} />
+            {/* Acciones de estado contextuales — solo las transiciones válidas
+                desde el estado actual (mismo origen que QuoteDetailScreen). */}
+            {menuStatusActions.map(action => (
+              <MenuOption
+                key={action.to}
+                icon="tag-outline"
+                color={action.muted ? colors.textSecondary : colors.warning}
+                label={action.label}
+                onPress={() => requestStatusChange(action)}
+              />
+            ))}
             <MenuOption icon="trash-can-outline" color={colors.error}    label="Eliminar"       labelColor={colors.error} onPress={handleDelete} />
           </Dialog.Content>
           <Dialog.Actions>
@@ -592,25 +635,17 @@ export default function HistoryScreen({ navigation }) {
           </Dialog.Actions>
         </Dialog>
 
-        {/* Dialog: cambio de estado */}
-        <Dialog visible={!!statusDialogQuote} onDismiss={() => setStatusDialogQuote(null)} style={styles.dialog}>
-          <Dialog.Title>Cambiar estado</Dialog.Title>
+        {/* Dialog: confirmación de cambio de estado */}
+        <Dialog visible={!!confirmAction} onDismiss={() => setConfirmAction(null)} style={styles.dialog}>
+          <Dialog.Title>{confirmAction?.label}</Dialog.Title>
           <Dialog.Content>
-            <RadioButton.Group onValueChange={setSelectedStatus} value={selectedStatus}>
-              {STATUS_ORDER.map(s => (
-                <TouchableOpacity key={s} onPress={() => setSelectedStatus(s)} style={styles.radioOption} activeOpacity={0.7}>
-                  <RadioButton.Android value={s} color={QUOTE_STATUS_COLOR[s]} />
-                  <View style={styles.radioLabel}>
-                    <View style={[styles.statusDot, { backgroundColor: QUOTE_STATUS_COLOR[s] }]} />
-                    <Text variant="bodyLarge" style={{ color: colors.text }}>{QUOTE_STATUS_LABEL[s]}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </RadioButton.Group>
+            <Text variant="bodyMedium" style={{ color: colors.textSecondary }}>
+              {confirmAction?.message}
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setStatusDialogQuote(null)}>Cancelar</Button>
-            <Button onPress={handleStatusChange}>Confirmar</Button>
+            <Button onPress={() => setConfirmAction(null)}>Cancelar</Button>
+            <Button onPress={confirmStatusChange}>Confirmar</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -683,7 +718,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterPill: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -694,12 +728,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  // Ya no hay un ancho de fila fijo que repartir (la barra scrollea
+  // horizontal) — cada pill toma su ancho natural y no se achica.
+  filterPillFixed: {
+    flexShrink: 0,
+  },
   filterPillActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
   filterPillText: {
-    flex: 1,
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
@@ -716,6 +754,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   filterBadge: {
     position: 'absolute',
@@ -875,9 +914,4 @@ const styles = StyleSheet.create({
   menuOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9 },
   menuIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   menuLabel: { color: colors.text, fontWeight: '500' },
-
-  // Dialog cambio de estado
-  radioOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  radioLabel:  { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  statusDot:   { width: 10, height: 10, borderRadius: 5 },
 });
