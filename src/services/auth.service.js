@@ -149,13 +149,15 @@ export async function deleteCurrentUserAccount() {
   const uid = currentUser.uid;
 
   // Paso 1: Firestore (propaga error si falla — Auth no se borra)
-  const [quotesSnap, templatesSnap] = await Promise.all([
+  const [quotesSnap, templatesSnap, clientsSnap] = await Promise.all([
     getDocs(query(collection(db, 'quotes'), where('userId', '==', uid))),
     getDocs(query(collection(db, 'templates'), where('userId', '==', uid))),
+    getDocs(query(collection(db, 'clients'), where('userId', '==', uid))),
   ]);
   await Promise.all([
     ...quotesSnap.docs.map(d => deleteDoc(d.ref)),
     ...templatesSnap.docs.map(d => deleteDoc(d.ref)),
+    ...clientsSnap.docs.map(d => deleteDoc(d.ref)),
     deleteDoc(doc(db, 'businessProfiles', uid)),
     deleteDoc(doc(db, 'users', uid)),
   ]);

@@ -260,8 +260,14 @@ service cloud.firestore {
         && (request.resource.data.archivedAt == null || request.resource.data.archivedAt is timestamp)
         && request.resource.data.updatedAt is timestamp && request.resource.data.updatedAt == request.time;
 
-      // Sin borrado físico en esta fase — solo archivado (archived: true).
-      allow delete: if false;
+      // La app NO expone ningún botón de "borrar cliente" — la UI solo ofrece
+      // archivar/restaurar (ver ClientListScreen/ClientDetailScreen). Esta
+      // regla permite el borrado al dueño solo para que
+      // deleteCurrentUserAccount() (auth.service.js) pueda limpiar los
+      // clientes del usuario al eliminar la cuenta, mismo criterio que ya
+      // aplica a quotes/templates. No hay ninguna forma de disparar esto
+      // desde la interfaz salvo eliminando la cuenta entera.
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ── templates/{templateId} ─────────────────────────────────────────────

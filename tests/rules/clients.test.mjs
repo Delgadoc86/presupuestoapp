@@ -1,7 +1,10 @@
 /**
  * Reglas de clients/{clientId}: alta válida, allowlist exacta de campos,
  * validación de tipos, inmutabilidad de userId/createdAt, aislamiento entre
- * usuarios, y archivado/restauración (sin borrado físico).
+ * usuarios, y archivado/restauración. El borrado a nivel de reglas está
+ * permitido para el dueño (lo necesita deleteCurrentUserAccount()) pero la
+ * app no expone ningún botón de "borrar cliente" en ninguna pantalla — la
+ * única acción disponible en la UI es archivar.
  */
 import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -122,8 +125,15 @@ test('restaurar un cliente archivado funciona', async () => {
   assert.equal(snap.data().archivedAt, null);
 });
 
-test('no hay borrado físico — delete siempre falla, incluso para el dueño', async () => {
+test('el dueño puede borrar su cliente (lo usa deleteCurrentUserAccount al eliminar la cuenta)', async () => {
   await seedClient(env, 'c1', freshClientDoc('alice'));
   const db = authedDb(env, 'alice');
-  await assertFails(deleteDoc(doc(db, 'clients', 'c1')));
+  await assertSucceeds(deleteDoc(doc(db, 'clients', 'c1')));
+});
+
+test('un usuario no puede borrar un cliente ajeno', async () => {
+  await seedUser(env, 'bob', freshUserDoc('bob'));
+  await seedClient(env, 'cBob', freshClientDoc('bob'));
+  const db = authedDb(env, 'alice');
+  await assertFails(deleteDoc(doc(db, 'clients', 'cBob')));
 });
