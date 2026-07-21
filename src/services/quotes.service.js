@@ -17,6 +17,7 @@ import { getCurrentYearMonth } from '../utils/dateUtils';
 import { isEffectivelyPro } from '../utils/planStatus';
 import { APP_CONFIG } from '../config/appConfig';
 import { logError } from '../utils/errorUtils';
+import { isValidStatusTransition, getTrackingDateField } from '../utils/quoteStatus';
 
 function _checkUserLimits(userData) {
   if (userData.enabled === false) {
@@ -76,15 +77,15 @@ export function getDateFilterTimestamp(dateFilter) {
 /**
  * Construye la query paginada para el historial de presupuestos.
  *
- * Índices Firestore necesarios:
- *   1. quotes: userId ASC, createdAt DESC          → base + filtro fecha
- *   2. quotes: userId ASC, status ASC, createdAt DESC → filtro estado (± fecha)
- *
- * Firebase generará los links de creación de índice en la consola/logcat
- * la primera vez que se ejecute cada query.
+ * Índices Firestore necesarios (versionados en firestore.indexes.json):
+ *   1. quotes: userId ASC, createdAt DESC              → base + filtro fecha
+ *   2. quotes: status ASC, userId ASC, createdAt DESC   → filtro de un estado (± fecha)
+ *   3. quotes: userId ASC, clientId ASC, createdAt DESC → historial por cliente
+ * `where('status','in',[...])` (statusFilter como array) usa el mismo
+ * índice que el filtro de un solo estado.
  *
  * @param {string} userId
- * @param {{ statusFilter?: string|null, dateFilter?: string|null, lastDoc?: any }} opts
+ * @param {{ statusFilter?: string|string[]|null, dateFilter?: string|null, lastDoc?: any }} opts
  * @returns {import('firebase/firestore').Query}
  */
 export function buildHistoryQuery(userId, { statusFilter = null, dateFilter = null, lastDoc = null } = {}) {
@@ -93,7 +94,9 @@ export function buildHistoryQuery(userId, { statusFilter = null, dateFilter = nu
     orderBy('createdAt', 'desc'),
   ];
 
-  if (statusFilter) {
+  if (Array.isArray(statusFilter) && statusFilter.length > 0) {
+    constraints.push(where('status', 'in', statusFilter));
+  } else if (statusFilter) {
     constraints.push(where('status', '==', statusFilter));
   }
 
@@ -204,18 +207,51 @@ export async function updateQuote(quoteId, data) {
 }
 
 /**
- * Actualiza únicamente el estado de un presupuesto.
- * Separado de updateQuote para evitar sobreescribir datos al cambiar solo el estado.
+ * Cambia el estado de un presupuesto siguiendo el estado-máquina de
+ * src/utils/quoteStatus.js. Corre dentro de una transacción: el estado
+ * ACTUAL se lee de adentro (nunca se confía en lo que la UI crea que es el
+ * estado — puede estar desactualizado si otro dispositivo ya lo cambió), y
+ * la fecha de seguimiento del estado destino se fija solo si todavía no
+ * existía. Si dos dispositivos cambian el estado casi al mismo tiempo,
+ * Firestore serializa las transacciones — la segunda relee el estado ya
+ * actualizado por la primera y se valida contra ESE estado real.
  *
  * @param {string} quoteId - ID del documento.
- * @param {string} status - Nuevo estado: 'draft' | 'sent' | 'accepted' | 'rejected' | 'paid'.
+ * @param {string} newStatus - Estado destino: 'draft'|'sent'|'accepted'|'rejected'|'expired'|'paid'.
  * @returns {Promise<void>}
+ * @throws {Error} code: 'quote_not_found' | 'invalid_status_transition'
  */
-export async function updateQuoteStatus(quoteId, status) {
+export async function updateQuoteStatus(quoteId, newStatus) {
+  const quoteRef = doc(db, 'quotes', quoteId);
   try {
-    await updateDoc(doc(db, 'quotes', quoteId), {
-      status,
-      updatedAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(quoteRef);
+      if (!snap.exists()) {
+        const err = new Error('Presupuesto no encontrado');
+        err.code = 'quote_not_found';
+        throw err;
+      }
+      const data = snap.data();
+      const currentStatus = data.status;
+
+      if (!isValidStatusTransition(currentStatus, newStatus)) {
+        const err = new Error(`No se puede pasar de "${currentStatus}" a "${newStatus}"`);
+        err.code = 'invalid_status_transition';
+        throw err;
+      }
+
+      const updates = {
+        status: newStatus,
+        statusUpdatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const dateField = getTrackingDateField(newStatus);
+      if (dateField && !data[dateField]) {
+        updates[dateField] = serverTimestamp();
+      }
+
+      transaction.update(quoteRef, updates);
     });
   } catch (error) {
     logError('updateQuoteStatus', error);

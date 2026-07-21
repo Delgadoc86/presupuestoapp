@@ -7,7 +7,11 @@ export const QUOTE_STATUS = {
   SENT:     'sent',      // enviado, esperando respuesta
   ACCEPTED: 'accepted',  // cliente confirmó
   REJECTED: 'rejected',  // cliente rechazó
-  PAID:     'paid',      // trabajo abonado
+  EXPIRED:  'expired',   // se venció el plazo sin respuesta
+  // 'paid' se mantiene solo por compatibilidad con presupuestos existentes
+  // y la transición accepted->paid — no se construye ninguna función nueva
+  // alrededor de este estado, se retira cuando exista jobs.paymentStatus.
+  PAID:     'paid',
 };
 
 /** Etiquetas en español para mostrar en la UI. */
@@ -16,6 +20,7 @@ export const QUOTE_STATUS_LABEL = {
   sent:     'Enviado',
   accepted: 'Aceptado',
   rejected: 'Rechazado',
+  expired:  'Vencido',
   paid:     'Pagado',
 };
 
@@ -25,6 +30,7 @@ export const QUOTE_STATUS_COLOR = {
   sent:     '#7C3AED',  // violeta
   accepted: '#16A34A',  // verde
   rejected: '#DC2626',  // rojo
+  expired:  '#64748B',  // gris — ni "éxito" ni "error", solo venció
   paid:     '#16A34A',  // verde
 };
 
@@ -34,6 +40,7 @@ export const QUOTE_STATUS_BG_COLOR = {
   sent:     '#F5F3FF',
   accepted: '#F0FDF4',
   rejected: '#FEF2F2',
+  expired:  '#F1F5F9',
   paid:     '#F0FDF4',
 };
 
