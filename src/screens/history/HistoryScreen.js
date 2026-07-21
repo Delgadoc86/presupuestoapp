@@ -119,15 +119,26 @@ function buildFlatList(quotes) {
 
 // ── Componente principal ────────────────────────────────────────────────────
 
-export default function HistoryScreen({ navigation }) {
+export default function HistoryScreen({ navigation, route }) {
   const { user } = useAuthContext();
   const { showSnackbar } = useAppContext();
   const insets = useSafeAreaInsets();
 
   // Filtros aplicados (los que alimentan la query Firestore)
   const [searchText,    setSearchText]    = useState('');
-  const [statusFilter,  setStatusFilter]  = useState(null);
+  const [statusFilter,  setStatusFilter]  = useState(route.params?.initialStatusFilter ?? null);
   const [dateFilter,    setDateFilter]    = useState(null);
+
+  // Filtro inicial recibido por navegación (ej. desde las tarjetas de Home).
+  // Se limpia el param después de aplicarlo para que un segundo foco en esta
+  // pantalla (sin volver a tocar la tarjeta) no lo vuelva a forzar.
+  useEffect(() => {
+    if (route.params?.initialStatusFilter) {
+      setStatusFilter(route.params.initialStatusFilter);
+      navigation.setParams({ initialStatusFilter: undefined });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.initialStatusFilter]);
 
   // Estado temporal del modal (se aplica solo al presionar "Aplicar")
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);

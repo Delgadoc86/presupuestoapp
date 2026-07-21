@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getDocs } from 'firebase/firestore';
+import { useFocusEffect } from '@react-navigation/native';
+import { getDocs, getCountFromServer, collection, query, where } from 'firebase/firestore';
+import { db } from '../../../firebase.config';
 import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
@@ -12,6 +14,8 @@ import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper'
 import { getPlanStatus } from '../../utils/planStatus';
 import { buildHistoryQuery } from '../../services/quotes.service';
 import { formatCurrency } from '../../utils/formatters';
+import { QUOTE_STATUS } from '../../utils/constants';
+import { deriveStatusCounts } from '../../utils/homeStats';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -19,6 +23,13 @@ function getGreeting() {
   if (h < 20) return 'Buenas tardes';
   return 'Buenas noches';
 }
+
+const STATUS_CARDS = [
+  { status: QUOTE_STATUS.DRAFT,    label: 'Borradores',          icon: 'file-document-edit-outline', color: colors.textSecondary },
+  { status: QUOTE_STATUS.SENT,     label: 'Enviados\npendientes', icon: 'send-outline',                color: colors.sent },
+  { status: QUOTE_STATUS.ACCEPTED, label: 'Aceptados',            icon: 'check-circle-outline',        color: colors.success },
+  { status: QUOTE_STATUS.EXPIRED,  label: 'Vencidos',             icon: 'clock-alert-outline',         color: colors.warning },
+];
 
 function PlanBanner({ userData, userEmail }) {
   if (!userData) return null;
@@ -88,24 +99,61 @@ export default function HomeScreen({ navigation }) {
   const { business } = useBusinessContext();
   const { isAdmin, loading: adminLoading } = useIsAdmin();
   const [monthStats, setMonthStats] = useState({ count: 0, total: 0, loading: true });
+  const [statusCounts, setStatusCounts] = useState(() =>
+    deriveStatusCounts(STATUS_CARDS.map(c => c.status), [])
+  );
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  const fetchMonthStats = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const q = buildHistoryQuery(user.uid, { dateFilter: 'month' });
-        const snap = await getDocs(q);
-        if (cancelled) return;
-        let total = 0;
-        snap.docs.forEach(d => { total += d.data().total ?? 0; });
-        setMonthStats({ count: snap.docs.length, total, loading: false });
-      } catch {
-        if (!cancelled) setMonthStats({ count: 0, total: 0, loading: false });
-      }
-    })();
-    return () => { cancelled = true; };
+    try {
+      const q = buildHistoryQuery(user.uid, { dateFilter: 'month' });
+      const snap = await getDocs(q);
+      let total = 0;
+      snap.docs.forEach(d => { total += d.data().total ?? 0; });
+      setMonthStats({ count: snap.docs.length, total, loading: false });
+    } catch {
+      setMonthStats({ count: 0, total: 0, loading: false });
+    }
   }, [user]);
+
+  // Las 4 queries corren en paralelo (Promise.allSettled) — un fallo puntual
+  // en una no bloquea a las otras 3, cada tarjeta muestra su propio fallback.
+  // getCountFromServer() es una agregación nativa de Firestore: no baja
+  // documentos, solo el conteo.
+  const fetchStatusCounts = useCallback(async () => {
+    if (!user) return;
+    const statuses = STATUS_CARDS.map(c => c.status);
+    const results = await Promise.allSettled(
+      statuses.map(status => getCountFromServer(
+        query(collection(db, 'quotes'), where('userId', '==', user.uid), where('status', '==', status))
+      ))
+    );
+    setStatusCounts(deriveStatusCounts(statuses, results));
+  }, [user]);
+
+  // useFocusEffect cubre tanto la carga inicial (la pantalla está enfocada
+  // al montar) como recargar cada vez que Home recupera el foco — no hace
+  // falta un useEffect de montaje aparte.
+  useFocusEffect(
+    useCallback(() => {
+      fetchMonthStats();
+      fetchStatusCounts();
+    }, [fetchMonthStats, fetchStatusCounts])
+  );
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await Promise.allSettled([fetchMonthStats(), fetchStatusCounts()]);
+    setRefreshing(false);
+  }
+
+  function goToFilteredHistory(status) {
+    navigation.navigate('History', {
+      screen: 'HistoryList',
+      params: { initialStatusFilter: status },
+    });
+  }
 
   const greeting  = useMemo(() => getGreeting(), []);
   const ownerName = business?.ownerName ?? '';
@@ -143,7 +191,13 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} tintColor={colors.primary} />
+        }
+      >
 
         {/* Header */}
         <View style={styles.header}>
@@ -184,6 +238,31 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.actionLabel}>{action.label}</Text>
               </Pressable>
             ))}
+          </View>
+        </View>
+
+        {/* Seguimiento — no bloquea el resto de Home: cada tarjeta tiene su
+            propio estado de carga/error, la pantalla entera no espera esto. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Seguimiento</Text>
+          <View style={styles.actionsGrid}>
+            {STATUS_CARDS.map((card) => {
+              const state = statusCounts[card.status] ?? { value: null, error: false };
+              const displayValue = state.value != null ? state.value : '—';
+              return (
+                <Pressable
+                  key={card.status}
+                  onPress={() => goToFilteredHistory(card.status)}
+                  style={({ pressed }) => [styles.statusCard, pressed && styles.actionCardPressed]}
+                >
+                  <View style={[styles.actionIconCircle, { backgroundColor: `${card.color}18` }]}>
+                    <MaterialCommunityIcons name={card.icon} size={24} color={card.color} />
+                  </View>
+                  <Text style={[styles.statusCardValue, { color: card.color }]}>{displayValue}</Text>
+                  <Text style={styles.actionLabel}>{card.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
@@ -282,7 +361,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  // Grid de acciones rápidas
+  // Grid de acciones rápidas / tarjetas de seguimiento
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -317,6 +396,25 @@ const styles = StyleSheet.create({
     color: colors.text,
     textAlign: 'center',
     lineHeight: 18,
+  },
+
+  // Tarjetas de seguimiento (mismo tamaño que las de acciones rápidas)
+  statusCard: {
+    width: '47%',
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 18,
+    gap: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  statusCardValue: {
+    fontSize: 22,
+    fontWeight: '800',
   },
 
   // Stats "Este mes"
