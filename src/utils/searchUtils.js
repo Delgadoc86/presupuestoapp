@@ -39,3 +39,18 @@ export function matchesSearch(quote, rawTerm) {
   ];
   return candidates.some(c => c != null && normalizeText(c).includes(term));
 }
+
+/**
+ * Verifica si un cliente coincide con el texto de búsqueda.
+ * Busca en: nombre y teléfono. Tolerante a mayúsculas/minúsculas y tildes.
+ *
+ * @param {Object} client
+ * @param {string} rawTerm
+ * @returns {boolean}
+ */
+export function matchesClientSearch(client, rawTerm) {
+  if (!rawTerm?.trim()) return true;
+  const term = normalizeText(rawTerm);
+  const candidates = [client.name, client.phone];
+  return candidates.some(c => c != null && normalizeText(c).includes(term));
+}
