@@ -19,6 +19,7 @@ import AppInput from '../../components/common/AppInput';
 import AppLoader from '../../components/common/AppLoader';
 import QuoteItemRow from '../../components/quotes/QuoteItemRow';
 import QuoteTotalsCard from '../../components/quotes/QuoteTotalsCard';
+import ClientPickerSheet from '../../components/clients/ClientPickerSheet';
 import { createQuote, updateQuote, calcValidUntil } from '../../services/quotes.service';
 import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
@@ -33,8 +34,6 @@ function generateItemId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 }
 
-const EMPTY_CLIENT = { name: '', phone: '', email: '' };
-
 export default function QuoteFormScreen({ navigation, route }) {
   const theme = useTheme();
   const { user } = useAuthContext();
@@ -43,11 +42,16 @@ export default function QuoteFormScreen({ navigation, route }) {
   const { templates } = useTemplates();
 
   const existingQuote = route.params?.quote ?? null;
+  const presetClient = route.params?.presetClient ?? null;
   const isEditing = !!existingQuote;
 
   // ── Estado del formulario ─────────────────────────────────
-  const [client, setClient] = useState(EMPTY_CLIENT);
-  const [clientErrors, setClientErrors] = useState({});
+  // client: null (todavía sin elegir) | { id: string|null, name, phone, email, address }
+  // id === null significa "cliente ocasional" — no está guardado en la
+  // colección clients, solo vive como snapshot dentro de este presupuesto.
+  const [client, setClient] = useState(presetClient ?? null);
+  const [clientPickerVisible, setClientPickerVisible] = useState(false);
+  const [clientError, setClientError] = useState(null);
   const [items, setItems] = useState([]);
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPE.FIXED);
@@ -56,13 +60,18 @@ export default function QuoteFormScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
 
-  // Pre-cargar datos al editar
+  // Pre-cargar datos al editar.
+  // Un presupuesto sin clientId (ocasional, o de antes de que existiera esta
+  // fase) se pre-carga igual que uno vinculado: el picker/tarjeta no
+  // distingue entre ambos casos, "Cambiar" siempre reabre el selector.
   useEffect(() => {
     if (existingQuote) {
       setClient({
+        id: existingQuote.clientId ?? null,
         name: existingQuote.client?.name ?? '',
-        phone: existingQuote.client?.phone ?? '',
-        email: existingQuote.client?.email ?? '',
+        phone: existingQuote.client?.phone ?? null,
+        email: existingQuote.client?.email ?? null,
+        address: existingQuote.client?.address ?? null,
       });
       setItems(
         (existingQuote.items ?? []).map(item => ({
@@ -128,11 +137,12 @@ export default function QuoteFormScreen({ navigation, route }) {
 
   // ── Validación y guardado ─────────────────────────────────
   function validate() {
-    const errs = {};
-    if (!client.name.trim()) errs.name = 'Ingresá el nombre del cliente';
-    if (!client.phone.trim()) errs.phone = 'Ingresá el teléfono';
-    setClientErrors(errs);
-    if (Object.keys(errs).length > 0) return false;
+    if (!client) {
+      setClientError('Elegí o creá un cliente para este presupuesto');
+      showSnackbar('Elegí o creá un cliente para este presupuesto', 'error');
+      return false;
+    }
+    setClientError(null);
     if (items.length === 0) {
       showSnackbar('Agregá al menos un ítem al presupuesto', 'error');
       return false;
@@ -161,10 +171,16 @@ export default function QuoteFormScreen({ navigation, route }) {
     setLoading(true);
     try {
       const quoteData = {
+        // clientId: null = cliente ocasional, sin ficha guardada.
+        clientId: client.id ?? null,
+        // Snapshot inmutable del cliente al momento de crear — igual criterio
+        // que el snapshot del negocio de abajo: si el cliente se edita o se
+        // archiva después, este presupuesto sigue mostrando estos datos.
         client: {
           name: client.name.trim(),
-          phone: client.phone.trim(),
-          email: client.email.trim() || null,
+          phone: client.phone?.trim() || null,
+          email: client.email?.trim() || null,
+          address: client.address?.trim() || null,
         },
         // Snapshot del negocio al momento de crear (inmutable en el historial)
         business: {
@@ -199,8 +215,8 @@ export default function QuoteFormScreen({ navigation, route }) {
       } else {
         const quoteId = await createQuote(user.uid, quoteData);
         // Reset form before navigating so pressing back shows a blank form
-        setClient(EMPTY_CLIENT);
-        setClientErrors({});
+        setClient(null);
+        setClientError(null);
         setItems([]);
         setDiscount('');
         setDiscountType(DISCOUNT_TYPE.FIXED);
@@ -266,31 +282,44 @@ export default function QuoteFormScreen({ navigation, route }) {
         >
           {/* Sección: Cliente */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>DATOS DEL CLIENTE</Text>
-            <AppInput
-              label="Nombre *"
-              value={client.name}
-              onChangeText={v => { setClient(p => ({ ...p, name: v })); setClientErrors(p => ({ ...p, name: null })); }}
-              error={clientErrors.name}
-              autoCapitalize="words"
-              returnKeyType="next"
-            />
-            <AppInput
-              label="Teléfono *"
-              value={client.phone}
-              onChangeText={v => { setClient(p => ({ ...p, phone: v })); setClientErrors(p => ({ ...p, phone: null })); }}
-              error={clientErrors.phone}
-              keyboardType="phone-pad"
-              returnKeyType="next"
-            />
-            <AppInput
-              label="Email (opcional)"
-              value={client.email}
-              onChangeText={v => setClient(p => ({ ...p, email: v }))}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              returnKeyType="done"
-            />
+            <Text style={styles.sectionLabel}>CLIENTE</Text>
+            {client ? (
+              <TouchableOpacity
+                style={styles.clientCard}
+                onPress={() => setClientPickerVisible(true)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.clientCardAvatar}>
+                  <Text style={styles.clientCardAvatarText}>
+                    {client.name.trim().charAt(0).toUpperCase() || '?'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.clientCardNameRow}>
+                    <Text style={styles.clientCardName} numberOfLines={1}>{client.name}</Text>
+                    {!client.id && (
+                      <View style={styles.occasionalTag}>
+                        <Text style={styles.occasionalTagText}>Ocasional</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!!client.phone && (
+                    <Text style={styles.clientCardMeta} numberOfLines={1}>{client.phone}</Text>
+                  )}
+                </View>
+                <Text style={styles.changeClientText}>Cambiar</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.chooseClientBtn}
+                onPress={() => setClientPickerVisible(true)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="account-plus-outline" size={20} color={colors.primary} />
+                <Text style={styles.chooseClientText}>Elegí o creá un cliente</Text>
+              </TouchableOpacity>
+            )}
+            {!!clientError && <Text style={styles.clientErrorText}>{clientError}</Text>}
           </View>
 
           {/* Sección: Ítems */}
@@ -420,6 +449,17 @@ export default function QuoteFormScreen({ navigation, route }) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Selector de cliente: guardado / rápido / ocasional */}
+      <ClientPickerSheet
+        visible={clientPickerVisible}
+        onClose={() => setClientPickerVisible(false)}
+        onSelect={(selected) => {
+          setClient(selected);
+          setClientError(null);
+          setClientPickerVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -463,6 +503,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  // Selector de cliente
+  chooseClientBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: colors.primaryLight,
+  },
+  chooseClientText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  clientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  clientCardAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    flexShrink: 0,
+  },
+  clientCardAvatarText: {
+    fontWeight: '700',
+    color: colors.primary,
+    fontSize: 16,
+  },
+  clientCardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  clientCardName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    flexShrink: 1,
+  },
+  occasionalTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    backgroundColor: colors.warningLight,
+  },
+  occasionalTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.warning,
+  },
+  clientCardMeta: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  changeClientText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  clientErrorText: {
+    fontSize: 12,
+    color: colors.error,
+    marginLeft: 4,
   },
   sectionLabelRow: {
     flexDirection: 'row',
