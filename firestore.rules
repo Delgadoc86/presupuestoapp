@@ -78,13 +78,14 @@ service cloud.firestore {
 
     // Campo de fecha asociado a cada estado (null si ese estado no tiene una
     // fecha de seguimiento propia — draft y paid). Debe coincidir MANUALMENTE
-    // con TRACKING_DATE_FIELD de src/utils/quoteStatus.js.
+    // con TRACKING_DATE_FIELD de src/utils/quoteStatus.js. Se usa .get() con
+    // default sobre un map literal en vez de una cadena de ternarios: el
+    // compilador de reglas advertía "tipos distintos" (string vs null) en
+    // los dos lados de un ternario encadenado.
     function trackingDateForStatus(status) {
-      return status == 'sent'     ? 'sentAt'
-        :    status == 'accepted' ? 'acceptedAt'
-        :    status == 'rejected' ? 'rejectedAt'
-        :    status == 'expired'  ? 'expiredAt'
-        :    null;
+      return {
+        'sent': 'sentAt', 'accepted': 'acceptedAt', 'rejected': 'rejectedAt', 'expired': 'expiredAt'
+      }.get(status, null);
     }
 
     function trackingDatesValid(data) {
