@@ -1,7 +1,7 @@
 /**
  * AppTabNavigator — navegación principal de la app (post-onboarding).
  *
- * Estructura: BottomTabNavigator con 4 pestañas.
+ * Estructura: BottomTabNavigator con 5 pestañas.
  * Cada pestaña tiene su propio StackNavigator para manejar navegación
  * interna sin perder el estado de las otras pestañas.
  *
@@ -12,6 +12,11 @@
  *  ├── NewQuote      → QuoteNavigator
  *  │     ├── QuoteForm    (pantalla principal de la pestaña)
  *  │     └── QuoteDetail
+ *  ├── Clients       → ClientsNavigator
+ *  │     ├── ClientList        (pantalla principal)
+ *  │     ├── ClientDetail
+ *  │     ├── ClientForm
+ *  │     └── QuoteDetailClients (detalle desde el historial de un cliente)
  *  ├── History       → HistoryNavigator
  *  │     ├── HistoryList       (pantalla principal)
  *  │     ├── QuoteDetailHistory (detalle desde historial)
@@ -23,10 +28,10 @@
  *        ├── TemplateForm
  *        └── Account
  *
- * Por qué QuoteDetailScreen aparece en dos stacks (NewQuote e History):
+ * Por qué QuoteDetailScreen aparece en tres stacks (NewQuote, Clients e History):
  *   React Navigation no permite compartir una pantalla entre stacks distintos.
- *   QuoteDetailHistory es el mismo componente con nombre diferente para que
- *   el botón "volver" lleve al historial y no al formulario.
+ *   Cada instancia es el mismo componente con nombre diferente para que
+ *   el botón "volver" lleve al lugar correcto en cada caso.
  */
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -47,6 +52,7 @@ import AccountScreen from '../screens/settings/AccountScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 import AdminUpdateConfigScreen from '../screens/admin/AdminUpdateConfigScreen';
+import ClientsNavigator from './ClientsNavigator';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -143,6 +149,16 @@ export default function AppTabNavigator() {
           tabBarLabel: 'Presupuesto',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="plus-circle-outline" color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Clients"
+        component={ClientsNavigator}
+        options={{
+          tabBarLabel: 'Clientes',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="account-multiple-outline" color={color} focused={focused} />
           ),
         }}
       />
