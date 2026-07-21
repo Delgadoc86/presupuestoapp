@@ -121,21 +121,30 @@ businessProfiles/{uid}
 
 ### Colección: `quotes`
 
-Un documento por presupuesto. ID auto-generado por Firestore.
+Un documento por presupuesto. ID determinista `${uid}_${quoteNumber}` desde
+la fase de seguridad de reglas (ver más abajo) — los presupuestos creados
+antes de ese cambio conservan su ID aleatorio original, ambos formatos
+conviven sin problema (`read`/`update`/`delete` no dependen del formato).
 
 ```
 quotes/{quoteId}
 ├── userId       string    UID del dueño (para filtrar con where)
 ├── quoteNumber  number    número correlativo único por usuario (1, 2, 3...)
-├── status       string    "draft" | "sent" | "accepted" | "rejected" | "paid"
+├── status       string    "draft" | "sent" | "accepted" | "rejected" | "paid" | "expired"
+│                          ("paid" se mantiene por compatibilidad — se migrará
+│                          a jobs.paymentStatus cuando exista esa colección)
+├── clientId     string|null  referencia a clients/{clientId}; null = cliente
+│                              ocasional (sin ficha guardada) o presupuesto
+│                              anterior a la fase de Clientes
 ├── createdAt    Timestamp
 ├── updatedAt    Timestamp
 ├── validUntil   Timestamp fecha de vencimiento del presupuesto
 │
-├── client                 snapshot del cliente al momento de crear
-│   ├── name   string
-│   ├── phone  string
-│   └── email  string|null
+├── client                 snapshot inmutable del cliente al momento de crear
+│   ├── name    string
+│   ├── phone   string|null
+│   ├── email   string|null
+│   └── address string|null
 │
 ├── business               snapshot del negocio al momento de crear (inmutable)
 │   ├── ownerName     string
@@ -180,6 +189,34 @@ templates/{templateId}
 ├── createdAt  Timestamp
 └── updatedAt  Timestamp
 ```
+
+---
+
+### Colección: `clients`
+
+Ficha de contacto del cliente. ID auto-generado por Firestore. Sin borrado
+físico desde la UI — la única acción disponible es archivar/restaurar
+(`archived`). El historial de presupuestos de un cliente y su cantidad NO
+se guardan como contador aparte: siempre se calculan en vivo con la query
+`quotes` filtrada por `userId` + `clientId` (ver índice compuesto abajo).
+
+```
+clients/{clientId}
+├── userId      string    UID del dueño
+├── name        string    obligatorio
+├── phone       string|null
+├── email       string|null
+├── address     string|null
+├── notes       string|null
+├── archived    boolean   false = activo (visible en listado/selector)
+├── archivedAt  Timestamp|null
+├── createdAt   Timestamp
+└── updatedAt   Timestamp
+```
+
+**Índice compuesto necesario** (`firestore.indexes.json`):
+`quotes: userId ASC, clientId ASC, createdAt DESC` — historial de
+presupuestos de un cliente, ordenado por fecha.
 
 ---
 
