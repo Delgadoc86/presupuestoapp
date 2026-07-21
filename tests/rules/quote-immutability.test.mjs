@@ -45,10 +45,12 @@ test('18. no se puede cambiar createdAt en un update', async () => {
   }));
 });
 
-test('19. status fuera del enum permitido falla; una transición válida sí funciona', async () => {
+test('19. status fuera del enum permitido falla', async () => {
   const db = authedDb(env, 'alice');
+  // 'cancelled' no pertenece al enum en absoluto — no llega ni a evaluarse
+  // como transición. Las transiciones válidas dentro del enum (y las
+  // inválidas-pero-en-enum) se cubren en quote-status-transitions.test.mjs.
   await assertFails(updateDoc(doc(db, 'quotes', 'alice_1'), { status: 'cancelled' }));
-  await assertSucceeds(updateDoc(doc(db, 'quotes', 'alice_1'), { status: 'sent' }));
 });
 
 test('28. un presupuesto histórico con ID aleatorio conserva lectura y edición', async () => {

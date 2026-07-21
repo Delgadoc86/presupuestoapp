@@ -74,6 +74,90 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/clients/$(clientId)).data.userId == request.auth.uid;
     }
 
+    function isNullableTimestamp(v) { return v == null || v is timestamp; }
+
+    // Campo de fecha asociado a cada estado (null si ese estado no tiene una
+    // fecha de seguimiento propia — draft y paid). Debe coincidir MANUALMENTE
+    // con TRACKING_DATE_FIELD de src/utils/quoteStatus.js.
+    function trackingDateForStatus(status) {
+      return status == 'sent'     ? 'sentAt'
+        :    status == 'accepted' ? 'acceptedAt'
+        :    status == 'rejected' ? 'rejectedAt'
+        :    status == 'expired'  ? 'expiredAt'
+        :    null;
+    }
+
+    function trackingDatesValid(data) {
+      return isNullableTimestamp(data.get('sentAt', null))
+        && isNullableTimestamp(data.get('acceptedAt', null))
+        && isNullableTimestamp(data.get('rejectedAt', null))
+        && isNullableTimestamp(data.get('expiredAt', null))
+        && isNullableTimestamp(data.get('statusUpdatedAt', null));
+    }
+
+    // Debe coincidir MANUALMENTE con STATUS_TRANSITIONS de
+    // src/utils/quoteStatus.js — tests/rules/quote-status-transitions.test.mjs
+    // importa esa tabla real y prueba cada transición contra estas reglas
+    // para detectar una eventual desincronización entre ambos lados.
+    // 'paid' es terminal (sin salidas); 'accepted' -> 'paid' se mantiene por
+    // compatibilidad hasta que exista jobs.paymentStatus.
+    function isAllowedStatusTransition(from, to) {
+      return (from == 'draft'    && to == 'sent')
+        || (from == 'sent'     && to == 'draft')
+        || (from == 'sent'     && to == 'accepted')
+        || (from == 'sent'     && to == 'rejected')
+        || (from == 'sent'     && to == 'expired')
+        || (from == 'accepted' && to == 'rejected')
+        || (from == 'accepted' && to == 'paid')
+        || (from == 'rejected' && to == 'accepted')
+        || (from == 'expired'  && to == 'sent');
+    }
+
+    // ¿Este campo de fecha puede cambiar en este write? Solo si ES la fecha
+    // del estado al que se está transicionando ahora mismo (dateField) — y
+    // en ese caso, solo de null a request.time (primera vez). Cualquier otro
+    // campo de fecha, o esta misma fecha fuera de esa transición puntual,
+    // debe permanecer EXACTAMENTE igual. Esto es lo que impide modificar a
+    // mano una fecha ajena al cambio de estado en curso, y también impide
+    // tocar cualquier fecha en una edición de contenido normal (dateField
+    // es null cuando el status no cambia).
+    function trackingDateFieldOk(fieldName, dateField, before, after) {
+      return fieldName == dateField
+        ? (before.get(fieldName, null) == null
+            ? after.get(fieldName, null) == request.time
+            : after.get(fieldName, null) == before.get(fieldName, null))
+        : after.get(fieldName, null) == before.get(fieldName, null);
+    }
+
+    // Protege las 4 fechas de seguimiento en CUALQUIER update (cambie o no
+    // el status) — ver trackingDateFieldOk.
+    function trackingDatesProtected() {
+      let before = resource.data;
+      let after  = request.resource.data;
+      let dateField = before.status != after.status ? trackingDateForStatus(after.status) : null;
+
+      return trackingDateFieldOk('sentAt', dateField, before, after)
+        && trackingDateFieldOk('acceptedAt', dateField, before, after)
+        && trackingDateFieldOk('rejectedAt', dateField, before, after)
+        && trackingDateFieldOk('expiredAt', dateField, before, after);
+    }
+
+    // statusUpdatedAt solo puede cambiar (a request.time) cuando status
+    // cambia. Si status no cambia, statusUpdatedAt tampoco debe tocarse.
+    function statusUpdatedAtOk() {
+      let before = resource.data;
+      let after  = request.resource.data;
+      return before.status != after.status
+        ? after.get('statusUpdatedAt', null) == request.time
+        : after.get('statusUpdatedAt', null) == before.get('statusUpdatedAt', null);
+    }
+
+    // La transición (resource.data.status -> request.resource.data.status)
+    // debe pertenecer a la tabla permitida.
+    function isValidStatusChange() {
+      return isAllowedStatusTransition(resource.data.status, request.resource.data.status);
+    }
+
     // Incremento válido de contador, ligado a la creación de UN presupuesto.
     function isValidQuoteCounterIncrement() {
       let before = resource.data;
@@ -183,6 +267,7 @@ service cloud.firestore {
         && request.resource.data.quoteNumber > 0
         && request.resource.data.createdAt is timestamp
         && request.resource.data.createdAt == request.time
+        && trackingDatesValid(request.resource.data)
         // clientId es opcional (cliente ocasional = null); si no es null,
         // debe referenciar un cliente propio existente.
         && (request.resource.data.get('clientId', null) == null
@@ -196,8 +281,17 @@ service cloud.firestore {
 
       // Inmutabilidad de userId/quoteNumber/createdAt + enum cerrado de status.
       // 'paid' se mantiene por compatibilidad con la funcionalidad actual —
-      // se migrará a jobs.paymentStatus cuando exista la colección jobs.
-      // 'expired' se agrega ya (todavía nadie lo usa, no rompe nada).
+      // se migrará a jobs.paymentStatus cuando exista la colección jobs;
+      // isAllowedStatusTransition no tiene ninguna entrada con from == 'paid',
+      // así que queda terminal (sin salidas) automáticamente.
+      //
+      // Si status cambia, debe ser una transición permitida Y respetar
+      // trackingDatesProtected/statusUpdatedAtOk (fechas de seguimiento).
+      // Si status NO cambia, la edición de contenido queda libre como
+      // siempre — pero trackingDatesProtected() igual exige que las 4
+      // fechas de seguimiento permanezcan EXACTAMENTE iguales (no hay
+      // transición en curso, así que ninguna puede tocarse), y
+      // statusUpdatedAtOk() exige lo mismo para esa fecha.
       //
       // clientId: si no cambia, no se re-valida (permite seguir editando un
       // presupuesto cuyo cliente fue archivado o incluso borrado, sin quedar
@@ -209,6 +303,13 @@ service cloud.firestore {
         && request.resource.data.quoteNumber == resource.data.quoteNumber
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.status in ['draft','sent','accepted','rejected','paid','expired']
+        && trackingDatesValid(request.resource.data)
+        && trackingDatesProtected()
+        && statusUpdatedAtOk()
+        && (
+          request.resource.data.status == resource.data.status
+          || isValidStatusChange()
+        )
         && (
           request.resource.data.get('clientId', null) == resource.data.get('clientId', null)
           || request.resource.data.get('clientId', null) == null

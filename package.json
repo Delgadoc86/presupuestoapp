@@ -36,7 +36,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/*.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/*.test.mjs\"",
+    "test:logic": "node --test tests/logic/*.test.mjs",
+    "test": "npm run test:logic && npm run test:rules"
   },
   "private": true
 }

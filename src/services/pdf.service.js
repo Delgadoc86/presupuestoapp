@@ -3,8 +3,11 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { buildQuoteHTML } from '../utils/pdfTemplate';
-import { formatDateAR } from '../utils/dateUtils';
 import { logError } from '../utils/errorUtils';
+
+// buildWhatsAppMessage/buildWhatsAppUrl/etc. viven en utils/whatsappMessage.js
+// (sin dependencias de React Native/Expo, para poder testearlas con Node
+// puro) — este archivo se queda solo con lo que genera/comparte el PDF.
 
 export function sanitizeFileName(str) {
   return (str ?? '')
@@ -102,38 +105,4 @@ export async function printQuotePdf(quote, business) {
 export async function saveQuotePdfLocally(quote, business) {
   const { fileName } = await generateQuotePdfFile(quote, business);
   Alert.alert('PDF guardado', `El PDF quedo guardado en la app.\n\n${fileName}`);
-}
-
-/**
- * Construye el texto del mensaje de WhatsApp para enviar un presupuesto.
- */
-export function buildWhatsAppMessage(quote) {
-  const businessName = quote.business?.businessName ?? '';
-  const clientName = quote.client?.name ?? '';
-  const quoteNum = '#' + String(quote.quoteNumber ?? 0).padStart(4, '0');
-  const total = new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 0,
-  }).format(quote.total ?? 0);
-
-  let msg = 'Hola ' + clientName + '! Te envio el presupuesto ' + quoteNum;
-  if (businessName) msg += ' de ' + businessName;
-  msg += '.\n\nTotal: ' + total;
-
-  if (quote.validUntil) {
-    const fecha = formatDateAR(quote.validUntil);
-    if (fecha) msg += '\nValido hasta: ' + fecha;
-  }
-
-  msg += '\n\nCualquier consulta escribime!';
-  return msg;
-}
-
-/**
- * Construye la URL de WhatsApp para abrir una conversacion con mensaje pre-cargado.
- */
-export function buildWhatsAppUrl(phone, message) {
-  const cleaned = phone.replace(/\D/g, '');
-  return 'https://wa.me/' + cleaned + '?text=' + encodeURIComponent(message);
 }
