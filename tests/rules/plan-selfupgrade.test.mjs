@@ -5,7 +5,7 @@
 import { test, before, beforeEach, after } from 'node:test';
 import {
   createEnv, authedDb, seedUser, freshUserDoc, currentYearMonthUTC,
-  assertSucceeds, assertFails, doc, setDoc, updateDoc,
+  assertSucceeds, assertFails, doc, setDoc, updateDoc, deleteDoc,
 } from './setup.mjs';
 
 let env;
@@ -83,4 +83,16 @@ test('27. alta de usuario con email que no coincide con el token de auth falla',
 test('control: el alta legítima de una cuenta nueva sí funciona', async () => {
   const db = authedDb(env, 'newuser');
   await assertSucceeds(setDoc(doc(db, 'users', 'newuser'), freshUserDoc('newuser')));
+});
+
+test('control: el dueño puede borrar su propio doc (lo usa deleteCurrentUserAccount)', async () => {
+  await seedUser(env, 'alice', freshUserDoc('alice'));
+  const db = authedDb(env, 'alice');
+  await assertSucceeds(deleteDoc(doc(db, 'users', 'alice')));
+});
+
+test('control: un usuario no puede borrar el documento de otro usuario', async () => {
+  await seedUser(env, 'bob', freshUserDoc('bob'));
+  const db = authedDb(env, 'alice');
+  await assertFails(deleteDoc(doc(db, 'users', 'bob')));
 });

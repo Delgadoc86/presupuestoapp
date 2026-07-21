@@ -140,6 +140,12 @@ service cloud.firestore {
         || isValidQuoteCounterIncrement()
         || isValidFirstTimeCounterInit()
       );
+
+      // El dueño puede borrar su propio doc — lo usa deleteCurrentUserAccount()
+      // (auth.service.js) al eliminar la cuenta. La v3 original de esta regla
+      // dividió el "allow write" heredado en create/update y omitió delete por
+      // error — sin esto, borrar la cuenta queda roto en producción.
+      allow delete: if isSignedIn() && isOwner(uid);
     }
 
     // ── quotes/{quoteId} ────────────────────────────────────────────────────
