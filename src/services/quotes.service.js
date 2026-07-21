@@ -135,13 +135,19 @@ export function getQuotesQuery(userId) {
  * al mismo tiempo: la transacción lee lastQuoteNumber, lo incrementa y
  * escribe ambas operaciones de forma atómica.
  *
+ * El ID del documento es determinista (`${userId}_${quoteNumber}`) en vez de
+ * autogenerado. firestore.rules exige que coincida exactamente con el nuevo
+ * lastQuoteNumber del mismo commit — como una transacción/batch solo admite
+ * una escritura por documento, esto limita a un único presupuesto válido por
+ * incremento de contador (ver firestore.rules, quotes.create).
+ *
  * @param {string} userId - UID del usuario autenticado.
  * @param {Object} quoteData - Datos del presupuesto (client, items, totals, etc.).
  * @returns {Promise<string>} ID del documento creado en Firestore.
  */
 export async function createQuote(userId, quoteData) {
   const userRef = doc(db, 'users', userId);
-  const quoteRef = doc(collection(db, 'quotes'));
+  let newQuoteId;
 
   await runTransaction(db, async (transaction) => {
     const userSnap = await transaction.get(userRef);
@@ -152,6 +158,9 @@ export async function createQuote(userId, quoteData) {
     const nextNumber = lastNumber + 1;
     const currentMonth = getCurrentYearMonth();
     const effectivelyPro = isEffectivelyPro(userData);
+
+    newQuoteId = `${userId}_${nextNumber}`;
+    const quoteRef = doc(db, 'quotes', newQuoteId);
 
     transaction.update(userRef, {
       lastQuoteNumber: nextNumber,
@@ -171,7 +180,7 @@ export async function createQuote(userId, quoteData) {
     });
   });
 
-  return quoteRef.id;
+  return newQuoteId;
 }
 
 /**
@@ -232,7 +241,8 @@ export async function deleteQuote(quoteId) {
 
 /**
  * Duplica un presupuesto existente como nuevo borrador con número correlativo nuevo.
- * Usa la misma lógica de transacción que createQuote para garantizar unicidad.
+ * Usa la misma lógica de transacción que createQuote para garantizar unicidad,
+ * incluido el ID determinista `${userId}_${quoteNumber}` (ver createQuote).
  * Los campos de metadata (quoteNumber, status, createdAt, updatedAt, id) se descartan
  * del original y se reemplazán con valores frescos.
  *
@@ -244,7 +254,7 @@ export async function duplicateQuote(userId, sourceQuote) {
   const { quoteNumber, status, createdAt, updatedAt, id, ...rest } = sourceQuote;
 
   const userRef = doc(db, 'users', userId);
-  const quoteRef = doc(collection(db, 'quotes'));
+  let newQuoteId;
 
   await runTransaction(db, async (transaction) => {
     const userSnap = await transaction.get(userRef);
@@ -255,6 +265,9 @@ export async function duplicateQuote(userId, sourceQuote) {
     const nextNumber = lastNumber + 1;
     const currentMonth = getCurrentYearMonth();
     const effectivelyPro = isEffectivelyPro(userData);
+
+    newQuoteId = `${userId}_${nextNumber}`;
+    const quoteRef = doc(db, 'quotes', newQuoteId);
 
     transaction.update(userRef, {
       lastQuoteNumber: nextNumber,
@@ -274,7 +287,7 @@ export async function duplicateQuote(userId, sourceQuote) {
     });
   });
 
-  return quoteRef.id;
+  return newQuoteId;
 }
 
 /**

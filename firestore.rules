@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helpers generales ──────────────────────────────────────────────────
 
     function isSignedIn() {
       return request.auth != null;
@@ -13,40 +13,174 @@ service cloud.firestore {
     }
 
     // Admin check: el doc admins/{uid} existe → el usuario es admin.
-    // Nota: esta función hace una lectura extra por request; es aceptable
-    // dado el volumen actual de la app.
     function isAdmin() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // ── Colecciones ───────────────────────────────────────────────────────────
+    // ── Helpers de negocio para users/{uid} ────────────────────────────────
 
-    // users/{uid}
-    // Cada usuario lee/escribe su propio doc.
-    // Admin puede leer y escribir docs de cualquier usuario (gestión de planes).
+    // Debe coincidir MANUALMENTE con APP_CONFIG.demoQuoteLimit (src/config/appConfig.js).
+    // En la práctica quoteLimit siempre viene seteado explícito desde registerWithEmail,
+    // así que este default solo cubre documentos legacy sin el campo.
+    function demoQuoteLimitDefault() { return 3; }
+
+    function pad2(n) { return n < 10 ? '0' + string(n) : string(n); }
+
+    // UTC por defecto (Timestamp.year()/.month() sin argumento de zona horaria).
+    // dateUtils.js:getCurrentYearMonth() calcula en UTC para coincidir exactamente.
+    function currentYearMonth() {
+      return string(request.time.year()) + '-' + pad2(request.time.month());
+    }
+
+    function isProActive(userData) {
+      return userData.get('pro', false) == true &&
+        (!('proExpiresAt' in userData) || userData.proExpiresAt == null
+          || userData.proExpiresAt > request.time);
+    }
+
+    function effectiveQuotesThisMonth(userData) {
+      return userData.get('quoteMonth', '') == currentYearMonth()
+        ? userData.get('quotesThisMonth', 0) : 0;
+    }
+
+    function planFields()    { return ['planType','pro','enabled','quoteLimit','proExpiresAt',
+                                        'proActivatedAt','proRemainingDays','planUpdatedAt','suspendedAt']; }
+    function usageFields()   { return ['lastQuoteNumber','totalQuotes','quotesThisMonth','quoteMonth']; }
+    function profileFields() { return ['businessName','ownerName','onboardingComplete']; }
+
+    function createFieldsAllowed() {
+      return ['email','createdAt','onboardingComplete','lastQuoteNumber',
+              'planType','pro','enabled','quoteLimit',
+              'quotesThisMonth','quoteMonth','totalQuotes'];
+    }
+
+    // Incremento válido de contador, ligado a la creación de UN presupuesto.
+    function isValidQuoteCounterIncrement() {
+      let before = resource.data;
+      let after  = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+
+      let onlyUsageFields = changed.hasOnly(usageFields());
+      let beforeCount = effectiveQuotesThisMonth(before);
+      let limit = before.get('quoteLimit', demoQuoteLimitDefault());
+      let pro = isProActive(before);
+      let notSuspended = before.get('enabled', true) == true;
+
+      let seqOk = after.lastQuoteNumber == before.get('lastQuoteNumber', 0) + 1
+               && after.totalQuotes    == before.get('totalQuotes', 0) + 1;
+
+      // Pro activo: los contadores mensuales NO deben tocarse.
+      let proOk = pro && !changed.hasAny(['quotesThisMonth','quoteMonth']);
+
+      // No-Pro: debe respetar el límite ANTES de este write, y sumar exactamente 1.
+      let demoOk = !pro
+        && beforeCount < limit
+        && after.quotesThisMonth == beforeCount + 1
+        && after.quoteMonth == currentYearMonth();
+
+      return onlyUsageFields && seqOk && notSuspended && (proOk || demoOk);
+    }
+
+    // Carve-out NARROW para _normalizeUserOnLogin (auth.service.js): inicializa
+    // a 0 SOLO si los campos no existen todavía. No exige enabled a propósito —
+    // un usuario suspendido puede seguir logueándose y viendo sus datos.
+    function isValidFirstTimeCounterInit() {
+      let before = resource.data;
+      let after  = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+      return changed.hasOnly(['quotesThisMonth','quoteMonth','totalQuotes'])
+        && !('quotesThisMonth' in before) && !('quoteMonth' in before) && !('totalQuotes' in before)
+        && after.quotesThisMonth == 0 && after.totalQuotes == 0
+        && after.quoteMonth == currentYearMonth();
+    }
+
+    // ── users/{uid} ─────────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read:  if isSignedIn() && (isOwner(uid) || isAdmin());
-      allow write: if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
+
+      // Alta de cuenta: allowlist estricta de campos + tipo + valor exacto de
+      // cada uno. Un usuario nuevo solo puede nacer como Demo limpio, sin
+      // privilegios ni contadores pre-cargados.
+      allow create: if isSignedIn() && isOwner(uid)
+        && request.resource.data.keys().hasOnly(createFieldsAllowed())
+        && request.resource.data.keys().hasAll(createFieldsAllowed())
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.onboardingComplete is bool
+        && request.resource.data.onboardingComplete == false
+        && request.resource.data.lastQuoteNumber is int
+        && request.resource.data.lastQuoteNumber == 0
+        && request.resource.data.planType is string
+        && request.resource.data.planType == 'demo'
+        && request.resource.data.pro is bool
+        && request.resource.data.pro == false
+        && request.resource.data.enabled is bool
+        && request.resource.data.enabled == true
+        && request.resource.data.quoteLimit is int
+        && request.resource.data.quoteLimit == demoQuoteLimitDefault()
+        && request.resource.data.quotesThisMonth is int
+        && request.resource.data.quotesThisMonth == 0
+        && request.resource.data.quoteMonth is string
+        && request.resource.data.quoteMonth == currentYearMonth()
+        && request.resource.data.totalQuotes is int
+        && request.resource.data.totalQuotes == 0;
+
+      // Admin: solo puede tocar planFields — ni perfil, ni contadores, ni
+      // borrarlos vía un set() sin merge (affectedKeys() detecta también las
+      // claves eliminadas, no solo las agregadas/cambiadas).
+      allow update: if isSignedIn() && isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(planFields());
+
+      // Dueño: tres caminos, ninguno puede tocar planFields.
+      allow update: if isSignedIn() && isOwner(uid) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(profileFields())
+        || isValidQuoteCounterIncrement()
+        || isValidFirstTimeCounterInit()
+      );
     }
 
-    // businessProfiles/{uid}
-    // Solo el propio usuario puede escribir su perfil. Admin puede leer.
-    match /businessProfiles/{uid} {
-      allow read:  if isSignedIn() && (isOwner(uid) || isAdmin());
-      allow write: if isSignedIn() && isOwner(uid);
-    }
-
-    // quotes/{quoteId}
-    // Acceso restringido al usuario dueño del presupuesto.
+    // ── quotes/{quoteId} ────────────────────────────────────────────────────
     match /quotes/{quoteId} {
-      allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // ID determinista ${uid}_${quoteNumber}: un batch/transacción solo admite
+      // una escritura por documento, así que como máximo hay un incremento
+      // válido de lastQuoteNumber por commit — eso limita a un único quoteId
+      // válido por commit, cerrando la posibilidad de crear varios quotes con
+      // un solo incremento de contador.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.quoteNumber is int
+        && request.resource.data.quoteNumber > 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.createdAt == request.time
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enabled', true) == true
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastQuoteNumber ==
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('lastQuoteNumber', 0) + 1
+        && request.resource.data.quoteNumber ==
+             getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastQuoteNumber
+        && quoteId == request.auth.uid + '_' + string(request.resource.data.quoteNumber);
+
+      // Inmutabilidad de userId/quoteNumber/createdAt + enum cerrado de status.
+      // 'paid' se mantiene por compatibilidad con la funcionalidad actual —
+      // se migrará a jobs.paymentStatus cuando exista la colección jobs.
+      // 'expired' se agrega ya (todavía nadie lo usa, no rompe nada).
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.quoteNumber == resource.data.quoteNumber
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.status in ['draft','sent','accepted','rejected','paid','expired']
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enabled', true) == true;
+
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // templates/{templateId}
+    // ── templates/{templateId} ─────────────────────────────────────────────
     // Acceso restringido al usuario dueño de la plantilla.
     match /templates/{templateId} {
       allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
@@ -55,17 +189,15 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // admins/{uid}
-    // Solo lectura para usuarios autenticados (para verificar si son admin).
-    // Escritura solo desde Firebase Console — nunca desde la app.
+    // ── admins/{uid} ────────────────────────────────────────────────────────
+    // Solo lectura para usuarios autenticados. Escritura solo desde la consola.
     match /admins/{uid} {
       allow read:  if isSignedIn();
       allow write: if false;
     }
 
-    // appConfig/{docId}
-    // Info no sensible (versión mínima, aviso de actualización). Lectura pública
-    // para poder chequear actualizaciones incluso antes de iniciar sesión.
+    // ── appConfig/{docId} ───────────────────────────────────────────────────
+    // Info no sensible (versión mínima, aviso de actualización). Lectura pública.
     match /appConfig/{docId} {
       allow read:  if true;
       allow write: if isAdmin();

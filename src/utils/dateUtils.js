@@ -1,10 +1,17 @@
 /**
- * Retorna el año y mes actual en formato 'YYYY-MM'.
+ * Retorna el año y mes actual en formato 'YYYY-MM', en UTC.
  * Reemplaza _currentYearMonth() duplicada en auth.service, quotes.service y HomeScreen.
+ *
+ * Usa UTC (no hora local) a propósito: firestore.rules calcula el mes vigente
+ * con Timestamp.year()/.month() sin argumento de zona horaria, que es UTC por
+ * defecto. Si este helper usara hora local, habría una ventana de varias horas
+ * alrededor de cada cambio de mes (según el huso del dispositivo) en la que la
+ * app y las reglas discreparían sobre qué mes es, rechazando creaciones de
+ * presupuesto legítimas.
  */
 export function getCurrentYearMonth() {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /** Retorna new Date() — facilita mockear en tests futuros. */

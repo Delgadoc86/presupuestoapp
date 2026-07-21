@@ -28,13 +28,15 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "babel-preset-expo": "~54.0.11"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/*.test.mjs\""
   },
   "private": true
 }
