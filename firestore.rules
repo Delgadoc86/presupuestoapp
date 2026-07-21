@@ -55,6 +55,25 @@ service cloud.firestore {
               'quotesThisMonth','quoteMonth','totalQuotes'];
     }
 
+    // ── Helpers de negocio para clients/{clientId} ─────────────────────────
+
+    function isNullableString(v) { return v == null || v is string; }
+
+    function clientFieldsAllowed() {
+      return ['userId','name','phone','email','address','notes',
+              'archived','archivedAt','createdAt','updatedAt'];
+    }
+
+    // ¿clientId referencia un cliente propio del usuario? Usada tanto en la
+    // creación como en la edición de quotes. No exige archived == false a
+    // propósito: un presupuesto ya vinculado a un cliente archivado debe
+    // poder seguir editándose sin quedar bloqueado.
+    function referencesOwnClient(clientId) {
+      return clientId is string
+        && exists(/databases/$(database)/documents/clients/$(clientId))
+        && get(/databases/$(database)/documents/clients/$(clientId)).data.userId == request.auth.uid;
+    }
+
     // Incremento válido de contador, ligado a la creación de UN presupuesto.
     function isValidQuoteCounterIncrement() {
       let before = resource.data;
@@ -164,6 +183,10 @@ service cloud.firestore {
         && request.resource.data.quoteNumber > 0
         && request.resource.data.createdAt is timestamp
         && request.resource.data.createdAt == request.time
+        // clientId es opcional (cliente ocasional = null); si no es null,
+        // debe referenciar un cliente propio existente.
+        && (request.resource.data.get('clientId', null) == null
+            || referencesOwnClient(request.resource.data.clientId))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enabled', true) == true
         && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastQuoteNumber ==
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('lastQuoteNumber', 0) + 1
@@ -175,15 +198,70 @@ service cloud.firestore {
       // 'paid' se mantiene por compatibilidad con la funcionalidad actual —
       // se migrará a jobs.paymentStatus cuando exista la colección jobs.
       // 'expired' se agrega ya (todavía nadie lo usa, no rompe nada).
+      //
+      // clientId: si no cambia, no se re-valida (permite seguir editando un
+      // presupuesto cuyo cliente fue archivado o incluso borrado, sin quedar
+      // bloqueado). Si cambia, el nuevo valor debe ser null o referenciar un
+      // cliente propio.
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.quoteNumber == resource.data.quoteNumber
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.status in ['draft','sent','accepted','rejected','paid','expired']
+        && (
+          request.resource.data.get('clientId', null) == resource.data.get('clientId', null)
+          || request.resource.data.get('clientId', null) == null
+          || referencesOwnClient(request.resource.data.clientId)
+        )
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enabled', true) == true;
 
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── clients/{clientId} ──────────────────────────────────────────────────
+    // Acceso restringido al usuario dueño. No lleva el mismo nivel de rigor
+    // que users/quotes (getAfter, transacciones) porque nada acá gatea un
+    // límite de plan ni un valor monetario — es una ficha de contacto.
+    match /clients/{clientId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(clientFieldsAllowed())
+        && request.resource.data.keys().hasAll(clientFieldsAllowed())
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && isNullableString(request.resource.data.phone)
+        && isNullableString(request.resource.data.email)
+        && isNullableString(request.resource.data.address)
+        && isNullableString(request.resource.data.notes)
+        && request.resource.data.archived is bool && request.resource.data.archived == false
+        && (request.resource.data.archivedAt == null || request.resource.data.archivedAt is timestamp)
+        && request.resource.data.createdAt is timestamp && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt is timestamp && request.resource.data.updatedAt == request.time;
+
+      // Cubre tanto una edición completa del formulario como un archivar/
+      // restaurar parcial: request.resource.data siempre refleja el documento
+      // COMPLETO resultante (los campos no tocados por este write se
+      // mantienen), así que la misma validación exhaustiva sirve para ambos
+      // casos sin necesitar una rama aparte.
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(clientFieldsAllowed())
+        && request.resource.data.keys().hasAll(clientFieldsAllowed())
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && isNullableString(request.resource.data.phone)
+        && isNullableString(request.resource.data.email)
+        && isNullableString(request.resource.data.address)
+        && isNullableString(request.resource.data.notes)
+        && request.resource.data.archived is bool
+        && (request.resource.data.archivedAt == null || request.resource.data.archivedAt is timestamp)
+        && request.resource.data.updatedAt is timestamp && request.resource.data.updatedAt == request.time;
+
+      // Sin borrado físico en esta fase — solo archivado (archived: true).
+      allow delete: if false;
     }
 
     // ── templates/{templateId} ─────────────────────────────────────────────

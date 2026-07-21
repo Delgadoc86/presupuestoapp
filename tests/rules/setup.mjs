@@ -26,6 +26,7 @@ import {
   collection,
   query,
   where,
+  orderBy,
   serverTimestamp,
   runTransaction,
   writeBatch,
@@ -44,6 +45,7 @@ export {
   collection,
   query,
   where,
+  orderBy,
   serverTimestamp,
   runTransaction,
   writeBatch,
@@ -85,6 +87,12 @@ export async function seedAdmin(env, uid) {
 export async function seedQuote(env, quoteId, data) {
   await env.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'quotes', quoteId), data);
+  });
+}
+
+export async function seedClient(env, clientId, data) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'clients', clientId), data);
   });
 }
 
@@ -133,8 +141,12 @@ export function freshUserDoc(uid, overrides = {}) {
  * poder probar el camino legítimo real contra las reglas desplegadas.
  * A nivel de reglas, "crear" y "duplicar" son la misma operación
  * (quotes.create) — este helper representa a ambas.
+ *
+ * @param {object} [opts]
+ * @param {string|null} [opts.clientId] - null = cliente ocasional (default).
  */
-export async function createValidQuote(db, uid) {
+export async function createValidQuote(db, uid, opts = {}) {
+  const { clientId = null } = opts;
   const userRef = doc(db, 'users', uid);
   let newQuoteId;
   await runTransaction(db, async (tx) => {
@@ -160,9 +172,10 @@ export async function createValidQuote(db, uid) {
     });
     tx.set(quoteRef, {
       userId: uid,
+      clientId,
       quoteNumber: nextNumber,
       status: 'draft',
-      client: { name: 'Cliente Test', phone: '1122334455', email: null },
+      client: { name: 'Cliente Test', phone: '1122334455', email: null, address: null },
       items: [],
       subtotal: 0,
       discount: 0,
@@ -176,4 +189,21 @@ export async function createValidQuote(db, uid) {
     });
   });
   return newQuoteId;
+}
+
+/** Documento clients/{id} con la misma forma que produce clients.service.js#createClient. */
+export function freshClientDoc(uid, overrides = {}) {
+  return {
+    userId: uid,
+    name: 'Cliente Test',
+    phone: null,
+    email: null,
+    address: null,
+    notes: null,
+    archived: false,
+    archivedAt: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  };
 }
