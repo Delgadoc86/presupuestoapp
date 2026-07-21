@@ -1,40 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
+  AppState,
+  Linking,
 } from 'react-native';
-import { Text, Surface, Button, Dialog, Portal, RadioButton } from 'react-native-paper';
+import { Text, Surface, Button, Dialog, Portal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppLoader from '../../components/common/AppLoader';
 import QuoteStatusBadge from '../../components/quotes/QuoteStatusBadge';
 import { updateQuoteStatus, deleteQuote } from '../../services/quotes.service';
-import {
-  shareQuotePdf,
-  printQuotePdf,
-} from '../../services/pdf.service';
+import { shareQuotePdf, printQuotePdf } from '../../services/pdf.service';
+import { buildWhatsAppMessage, buildWhatsAppUrl, isValidWhatsAppPhone } from '../../utils/whatsappMessage';
+import { shouldPromptAfterWhatsAppReturn } from '../../utils/whatsappFollowUp';
 import { useQuotes } from '../../hooks/useQuotes';
 import { useAppContext } from '../../context/AppContext';
-import {
-  QUOTE_STATUS,
-  QUOTE_STATUS_LABEL,
-  QUOTE_STATUS_COLOR,
-  DISCOUNT_TYPE,
-} from '../../utils/constants';
+import { QUOTE_STATUS_LABEL, DISCOUNT_TYPE } from '../../utils/constants';
 import { formatCurrency, formatDate, formatQuoteNumber } from '../../utils/formatters';
 import { colors } from '../../theme/colors';
 
-const STATUS_ORDER = [
-  QUOTE_STATUS.DRAFT,
-  QUOTE_STATUS.SENT,
-  QUOTE_STATUS.ACCEPTED,
-  QUOTE_STATUS.REJECTED,
-  QUOTE_STATUS.PAID,
-];
+/**
+ * Acciones disponibles por estado actual — refleja STATUS_TRANSITIONS de
+ * src/utils/quoteStatus.js (única fuente de verdad de qué transiciones son
+ * válidas; esto solo agrega la etiqueta y el texto de confirmación de cada
+ * una). Si se agrega/quita una transición allá, hay que reflejarlo acá.
+ */
+const STATUS_ACTIONS = {
+  draft: [
+    { to: 'sent', label: 'Marcar como enviado', message: '¿Marcar este presupuesto como enviado?' },
+  ],
+  sent: [
+    { to: 'accepted', label: 'Marcar como aceptado', message: '¿El cliente aceptó este presupuesto?' },
+    { to: 'rejected', label: 'Marcar como rechazado', message: '¿El cliente rechazó este presupuesto?' },
+    { to: 'expired', label: 'Marcar como vencido', message: '¿Marcar este presupuesto como vencido? Se usa cuando pasó la fecha de validez sin respuesta del cliente.' },
+    { to: 'draft', label: 'Volver a borrador', message: 'Esto deshace el envío — usalo solo si te equivocaste al marcarlo como enviado. ¿Volver a borrador?', muted: true },
+  ],
+  accepted: [
+    { to: 'paid', label: 'Marcar como pagado', message: '¿Marcar este presupuesto como pagado?' },
+    { to: 'rejected', label: 'Marcar como rechazado', message: 'El cliente cambió de opinión. ¿Marcar como rechazado?', muted: true },
+  ],
+  rejected: [
+    { to: 'accepted', label: 'Marcar como aceptado', message: 'El cliente cambió de opinión. ¿Marcar como aceptado?' },
+  ],
+  expired: [
+    { to: 'sent', label: 'Reenviar', message: '¿Volver a marcarlo como enviado?' },
+  ],
+  paid: [],
+};
 
 export default function QuoteDetailScreen({ navigation, route }) {
   const { quoteId } = route.params;
@@ -42,14 +59,33 @@ export default function QuoteDetailScreen({ navigation, route }) {
   const { showSnackbar } = useAppContext();
 
   const [loading, setLoading] = useState(false);
-  const [statusDialogVisible, setStatusDialogVisible] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null); // { to, label, message } | null
+
+  const awaitingWhatsAppReturnRef = useRef(false);
+  const previousAppStateRef = useRef(AppState.currentState);
 
   const quote = quotes.find(q => q.id === quoteId) ?? null;
 
+  // Al volver del segundo plano (ej. después de abrir WhatsApp), preguntar
+  // si corresponde marcar como enviado — nunca se marca solo.
   useEffect(() => {
-    if (quote) setSelectedStatus(quote.status);
-  }, [quote?.status]);
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (shouldPromptAfterWhatsAppReturn(previousAppStateRef.current, nextState, awaitingWhatsAppReturnRef.current)) {
+        awaitingWhatsAppReturnRef.current = false;
+        Alert.alert(
+          '¿Pudiste enviar el presupuesto?',
+          'Si ya se lo mandaste al cliente por WhatsApp, marcalo como enviado.',
+          [
+            { text: 'Todavía no', style: 'cancel' },
+            { text: 'Sí, marcar como enviado', onPress: () => runStatusChange('sent') },
+          ]
+        );
+      }
+      previousAppStateRef.current = nextState;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId]);
 
   if (!quote) {
     return (
@@ -71,21 +107,30 @@ export default function QuoteDetailScreen({ navigation, route }) {
   }
 
   // ── Cambio de estado ──────────────────────────────────────
-  async function handleStatusChange() {
-    if (selectedStatus === quote.status) {
-      setStatusDialogVisible(false);
-      return;
-    }
+  async function runStatusChange(newStatus) {
     setLoading(true);
-    setStatusDialogVisible(false);
     try {
-      await updateQuoteStatus(quoteId, selectedStatus);
-      showSnackbar(`Estado actualizado a ${QUOTE_STATUS_LABEL[selectedStatus]}`, 'success');
-    } catch {
-      showSnackbar('No se pudo actualizar el estado', 'error');
+      await updateQuoteStatus(quoteId, newStatus);
+      showSnackbar(`Estado actualizado a ${QUOTE_STATUS_LABEL[newStatus]}`, 'success');
+    } catch (error) {
+      if (error?.code === 'invalid_status_transition') {
+        showSnackbar('El estado cambió mientras tanto — actualizá la pantalla e intentá de nuevo.', 'error');
+      } else {
+        showSnackbar('No se pudo actualizar el estado', 'error');
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  function requestStatusChange(action) {
+    setConfirmAction(action);
+  }
+
+  async function confirmStatusChange() {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (action) await runStatusChange(action.to);
   }
 
   // ── PDF ───────────────────────────────────────────────────
@@ -111,14 +156,21 @@ export default function QuoteDetailScreen({ navigation, route }) {
     }
   }
 
-  async function handleWhatsApp() {
-    setLoading(true);
+  // ── WhatsApp — dos pasos explícitos, ver diseño (límite real de WhatsApp:
+  // el link de texto y el adjunto de archivo son mutuamente excluyentes) ──
+  async function handleSendWhatsAppMessage() {
+    if (!isValidWhatsAppPhone(quote.client?.phone)) {
+      showSnackbar('El teléfono del cliente no parece válido para WhatsApp', 'error');
+      return;
+    }
+    const message = buildWhatsAppMessage(quote);
+    const url = buildWhatsAppUrl(quote.client.phone, message);
     try {
-      await shareQuotePdf(quote, quote.business);
-    } catch (e) {
-      showSnackbar('No se pudo compartir el PDF', 'error');
-    } finally {
-      setLoading(false);
+      awaitingWhatsAppReturnRef.current = true;
+      await Linking.openURL(url);
+    } catch {
+      awaitingWhatsAppReturnRef.current = false;
+      showSnackbar('No se pudo abrir WhatsApp. ¿Está instalado?', 'error');
     }
   }
 
@@ -157,6 +209,9 @@ export default function QuoteDetailScreen({ navigation, route }) {
   const advance = quote.advance ?? 0;
   const saldo = Math.max(0, total - advance);
 
+  const lastChangeDate = quote.statusUpdatedAt ?? quote.updatedAt ?? quote.createdAt;
+  const availableActions = STATUS_ACTIONS[quote.status] ?? [];
+
   return (
     <SafeAreaView style={styles.container}>
       <AppLoader visible={loading} />
@@ -191,15 +246,33 @@ export default function QuoteDetailScreen({ navigation, route }) {
               <Text variant="bodySmall" style={styles.metaLabel}>Estado</Text>
               <QuoteStatusBadge status={quote.status} />
             </View>
-            <Button
-              mode="outlined"
-              compact
-              onPress={() => setStatusDialogVisible(true)}
-              style={styles.changeStatusBtn}
-            >
-              Cambiar
-            </Button>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text variant="bodySmall" style={styles.metaLabel}>Último cambio</Text>
+              <Text variant="bodyMedium" style={styles.metaValue}>
+                {formatDate(lastChangeDate) || '—'}
+              </Text>
+            </View>
           </View>
+
+          {availableActions.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.actionsWrap}>
+                {availableActions.map(action => (
+                  <Button
+                    key={action.to}
+                    mode={action.muted ? 'text' : 'outlined'}
+                    compact
+                    textColor={action.muted ? colors.textSecondary : colors.primary}
+                    onPress={() => requestStatusChange(action)}
+                    style={styles.statusActionBtn}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </View>
+            </>
+          )}
 
           <View style={styles.divider} />
 
@@ -327,7 +400,7 @@ export default function QuoteDetailScreen({ navigation, route }) {
                 <Text variant="titleSmall" style={{ fontWeight: '700', color: colors.text }}>
                   Saldo pendiente
                 </Text>
-                <Text variant="titleSmall" style={{ fontWeight: '700', color: QUOTE_STATUS_COLOR.sent }}>
+                <Text variant="titleSmall" style={{ fontWeight: '700', color: colors.sent }}>
                   {formatCurrency(saldo)}
                 </Text>
               </View>
@@ -409,48 +482,33 @@ export default function QuoteDetailScreen({ navigation, route }) {
         {!!quote.client?.phone && (
           <TouchableOpacity
             style={styles.whatsappBtn}
-            onPress={handleWhatsApp}
+            onPress={handleSendWhatsAppMessage}
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons name="whatsapp" size={22} color="#fff" />
             <Text variant="labelLarge" style={styles.whatsappLabel}>
-              Enviar por WhatsApp
+              Enviar mensaje por WhatsApp
             </Text>
           </TouchableOpacity>
         )}
       </ScrollView>
 
-      {/* Dialog: cambio de estado */}
+      {/* Dialog: confirmación de cambio de estado */}
       <Portal>
         <Dialog
-          visible={statusDialogVisible}
-          onDismiss={() => setStatusDialogVisible(false)}
+          visible={!!confirmAction}
+          onDismiss={() => setConfirmAction(null)}
           style={styles.dialog}
         >
-          <Dialog.Title>Cambiar estado</Dialog.Title>
+          <Dialog.Title>{confirmAction?.label}</Dialog.Title>
           <Dialog.Content>
-            <RadioButton.Group onValueChange={setSelectedStatus} value={selectedStatus}>
-              {STATUS_ORDER.map(s => (
-                <TouchableOpacity
-                  key={s}
-                  onPress={() => setSelectedStatus(s)}
-                  style={styles.radioOption}
-                  activeOpacity={0.7}
-                >
-                  <RadioButton.Android value={s} color={QUOTE_STATUS_COLOR[s]} />
-                  <View style={styles.radioLabel}>
-                    <View style={[styles.statusDot, { backgroundColor: QUOTE_STATUS_COLOR[s] }]} />
-                    <Text variant="bodyLarge" style={{ color: colors.text }}>
-                      {QUOTE_STATUS_LABEL[s]}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </RadioButton.Group>
+            <Text variant="bodyMedium" style={{ color: colors.textSecondary }}>
+              {confirmAction?.message}
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setStatusDialogVisible(false)}>Cancelar</Button>
-            <Button onPress={handleStatusChange}>Confirmar</Button>
+            <Button onPress={() => setConfirmAction(null)}>Cancelar</Button>
+            <Button onPress={confirmStatusChange}>Confirmar</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -514,7 +572,7 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   metaLabel: {
     color: colors.textSecondary,
@@ -528,7 +586,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-  changeStatusBtn: {
+  actionsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusActionBtn: {
     borderRadius: 8,
   },
   divider: {
@@ -607,21 +670,5 @@ const styles = StyleSheet.create({
   // Dialog
   dialog: {
     borderRadius: 20,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  radioLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   },
 });
