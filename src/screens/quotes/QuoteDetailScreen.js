@@ -223,7 +223,20 @@ export default function QuoteDetailScreen({ navigation, route }) {
 
         {/* Sección: Cliente */}
         <Surface style={styles.card} elevation={1}>
-          <Text variant="labelMedium" style={styles.sectionTitle}>CLIENTE</Text>
+          <View style={styles.clientHeaderRow}>
+            <Text variant="labelMedium" style={styles.sectionTitle}>CLIENTE</Text>
+            {!!quote.clientId && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Clients', {
+                  screen: 'ClientDetail',
+                  params: { clientId: quote.clientId },
+                })}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={styles.clientLink}>Ver ficha del cliente</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text variant="titleMedium" style={styles.boldText}>
             {quote.client?.name ?? '—'}
           </Text>
@@ -237,6 +250,12 @@ export default function QuoteDetailScreen({ navigation, route }) {
             <View style={styles.infoRow}>
               <MaterialCommunityIcons name="email-outline" size={16} color={colors.textSecondary} />
               <Text variant="bodyMedium" style={styles.infoText}>{quote.client.email}</Text>
+            </View>
+          )}
+          {!!quote.client?.address && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textSecondary} />
+              <Text variant="bodyMedium" style={styles.infoText}>{quote.client.address}</Text>
             </View>
           )}
         </Surface>
@@ -476,6 +495,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.textSecondary,
     letterSpacing: 0.8,
+  },
+  clientHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  clientLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
   },
   boldText: {
     fontWeight: '600',
