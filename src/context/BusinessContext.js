@@ -25,12 +25,12 @@ import { logError } from '../utils/errorUtils';
 const BusinessContext = createContext(null);
 
 export function BusinessProvider({ children }) {
-  const { user } = useAuthContext();
+  const { user, emailVerified } = useAuthContext();
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !emailVerified) {
       setBusiness(null);
       setLoading(false);
       return;
@@ -49,7 +49,7 @@ export function BusinessProvider({ children }) {
     );
 
     return unsubscribe;
-  }, [user]);
+  }, [user, emailVerified]);
 
   return (
     <BusinessContext.Provider value={{ business, loading }}>

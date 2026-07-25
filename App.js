@@ -12,6 +12,9 @@ import AppNavigator from './src/navigation/AppNavigator';
 import AppSnackbar from './src/components/common/AppSnackbar';
 import UpdateModal from './src/components/common/UpdateModal';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
+import { initMonitoring } from './src/config/monitoring';
+
+initMonitoring();
 
 export default function App() {
   return (

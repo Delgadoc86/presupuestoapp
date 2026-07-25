@@ -20,7 +20,8 @@ import {
   getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db } from '../../firebase.config';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../../firebase.config';
 import { deleteLogo } from './storage.service';
 import { getCurrentYearMonth } from '../utils/dateUtils';
 
@@ -143,7 +144,7 @@ export async function reauthenticateWithPassword(email, password) {
  * Si Firestore lanza en el paso 1, el error se propaga y Auth NO se borra.
  * La cuenta queda intacta — el usuario puede reintentar.
  */
-export async function deleteCurrentUserAccount() {
+async function deleteCurrentUserAccountLegacy() {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('No hay usuario autenticado');
   const uid = currentUser.uid;
@@ -167,4 +168,25 @@ export async function deleteCurrentUserAccount() {
 
   // Paso 3: Auth — último paso, invalida la sesión
   await deleteUser(currentUser);
+}
+
+/**
+ * Usa el borrado administrado por servidor. Durante la transición conserva el
+ * flujo anterior únicamente si la función aún no fue desplegada; cualquier
+ * otro error se propaga para permitir un reintento seguro.
+ */
+export async function deleteCurrentUserAccount() {
+  if (!auth.currentUser) throw new Error('No hay usuario autenticado');
+
+  try {
+    const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount');
+    await deleteAccount();
+    await signOut(auth).catch(() => {});
+  } catch (error) {
+    if (error?.code === 'functions/not-found' || error?.code === 'functions/unimplemented') {
+      await deleteCurrentUserAccountLegacy();
+      return;
+    }
+    throw error;
+  }
 }

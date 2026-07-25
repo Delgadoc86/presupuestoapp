@@ -81,7 +81,7 @@ test('27. alta de usuario con email que no coincide con el token de auth falla',
 });
 
 test('control: el alta legítima de una cuenta nueva sí funciona', async () => {
-  const db = authedDb(env, 'newuser');
+  const db = authedDb(env, 'newuser', { email_verified: false });
   await assertSucceeds(setDoc(doc(db, 'users', 'newuser'), freshUserDoc('newuser')));
 });
 

@@ -64,7 +64,11 @@ export async function createEnv(suiteName) {
 }
 
 export function authedDb(env, uid, tokenOptions = {}) {
-  return env.authenticatedContext(uid, { email: `${uid}@test.local`, ...tokenOptions }).firestore();
+  return env.authenticatedContext(uid, {
+    email: `${uid}@test.local`,
+    email_verified: true,
+    ...tokenOptions,
+  }).firestore();
 }
 
 export function unauthedDb(env) {

@@ -49,7 +49,7 @@ export default function AdminUpdateConfigScreen({ navigation }) {
   function validate() {
     const next = {};
     if (!/^\d+\.\d+\.\d+$/.test(latestVersion.trim())) {
-      next.latestVersion = 'Formato esperado: X.X.X (ej: 1.0.7)';
+      next.latestVersion = 'Formato esperado: X.X.X (ej: 1.0.8)';
     }
     if (!title.trim()) next.title = 'El título es obligatorio';
     if (!message.trim()) next.message = 'El mensaje es obligatorio';
@@ -118,7 +118,7 @@ export default function AdminUpdateConfigScreen({ navigation }) {
           </View>
 
           <AppInput
-            label="Última versión disponible (ej: 1.0.7)"
+            label="Última versión disponible (ej: 1.0.8)"
             value={latestVersion}
             onChangeText={setLatestVersion}
             error={errors.latestVersion}

@@ -53,7 +53,11 @@ export async function uploadLogo(userId, localUri) {
  */
 export async function deleteLogo(userId) {
   const logoRef = ref(storage, `logos/${userId}/logo.jpg`);
-  await deleteObject(logoRef).catch((error) => {
+  try {
+    await deleteObject(logoRef);
+  } catch (error) {
+    if (error?.code === 'storage/object-not-found') return;
     logError('deleteLogo', error);
-  });
+    throw error;
+  }
 }

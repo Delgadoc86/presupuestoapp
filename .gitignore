@@ -37,7 +37,9 @@ ui-debug.log
 *.pem
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
 
 
 # typescript

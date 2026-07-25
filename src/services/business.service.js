@@ -1,4 +1,4 @@
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 
 /**
@@ -11,7 +11,8 @@ import { db } from '../../firebase.config';
  * @returns {Promise<void>}
  */
 export async function saveBusinessProfile(userId, data) {
-  await setDoc(
+  const batch = writeBatch(db);
+  batch.set(
     doc(db, 'businessProfiles', userId),
     { ...data, updatedAt: serverTimestamp() },
     { merge: true }
@@ -20,16 +21,16 @@ export async function saveBusinessProfile(userId, data) {
   if (data.businessName !== undefined) userSync.businessName = data.businessName;
   if (data.ownerName !== undefined) userSync.ownerName = data.ownerName;
   if (Object.keys(userSync).length > 0) {
-    await setDoc(doc(db, 'users', userId), userSync, { merge: true });
+    batch.set(doc(db, 'users', userId), userSync, { merge: true });
   }
+  await batch.commit();
 }
 
 /**
  * Completa el onboarding: crea el perfil del negocio y marca al usuario como configurado.
  *
- * Se usan dos setDoc con merge:true en lugar de updateDoc porque ambos documentos
- * pueden no existir aún (usuario recién registrado). updateDoc fallaría con
- * "No document to update" si el doc no existe.
+ * Se usa un único batch con dos set(..., merge:true): ambos cambios quedan
+ * atómicos y el perfil todavía puede no existir en una cuenta recién creada.
  *
  * AuthContext escucha onSnapshot en users/{uid} y detecta el cambio de
  * onboardingComplete automáticamente, lo que dispara la transición en AppNavigator.
@@ -39,12 +40,13 @@ export async function saveBusinessProfile(userId, data) {
  * @returns {Promise<void>}
  */
 export async function completeOnboarding(userId, businessData) {
-  await setDoc(
+  const batch = writeBatch(db);
+  batch.set(
     doc(db, 'businessProfiles', userId),
     { ...businessData, updatedAt: serverTimestamp() },
     { merge: true }
   );
-  await setDoc(
+  batch.set(
     doc(db, 'users', userId),
     {
       onboardingComplete: true,
@@ -53,4 +55,5 @@ export async function completeOnboarding(userId, businessData) {
     },
     { merge: true }
   );
+  await batch.commit();
 }

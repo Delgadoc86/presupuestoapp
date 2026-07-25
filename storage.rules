@@ -2,12 +2,19 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // logos/{userId}/logo.jpg
-    // Cualquier usuario autenticado puede leer logos (necesario para PDF y preview).
-    // Solo el propio usuario puede subir/eliminar su logo.
-    match /logos/{userId}/{allPaths=**} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    function isVerifiedOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    // Único archivo permitido por usuario. La app lo convierte y sube como JPEG.
+    match /logos/{userId}/logo.jpg {
+      allow read: if isVerifiedOwner(userId);
+      allow create, update: if isVerifiedOwner(userId)
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow delete: if isVerifiedOwner(userId);
     }
   }
 }

@@ -1,3 +1,5 @@
+import { captureError } from '../config/monitoring';
+
 /**
  * Mapeo de códigos de error a mensajes amigables en español.
  * Combina errores de Firebase SDK y códigos propios de la app.
@@ -36,10 +38,8 @@ export function getFriendlyErrorMessage(error) {
 }
 
 /**
- * Loguea un error con contexto en desarrollo.
- * En producción solo hace log silencioso (sin ruido para el usuario).
- * Preparado para conectar Sentry u otro tracker en el futuro:
- *   Sentry.captureException(error, { tags: { context } });
+ * Loguea con contexto en desarrollo y, si EXPO_PUBLIC_SENTRY_DSN está
+ * configurado, reporta el error a Sentry en builds de producción.
  *
  * @param {string} context - Nombre del servicio/función que capturó el error.
  * @param {Error|unknown} error
@@ -47,5 +47,7 @@ export function getFriendlyErrorMessage(error) {
 export function logError(context, error) {
   if (__DEV__) {
     console.error(`[${context}]`, error);
+    return;
   }
+  captureError(context, error);
 }

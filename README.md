@@ -7,6 +7,27 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.8 (2026-07-24)
+
+**Release de estabilización para distribución local:**
+
+- Firestore y Storage endurecidos: email verificado, aislamiento por propietario,
+  validación completa de `businessProfiles` y logos JPEG de hasta 5 MB.
+- Borrado de cuenta trasladado a una Cloud Function callable con autenticación
+  reciente, borrado por lotes y bloqueo de escrituras concurrentes.
+- Perfil y onboarding ahora escriben de forma atómica mediante batch.
+- Cámara y micrófono bloqueados; se conserva únicamente el acceso necesario a la galería.
+- Ambientes EAS `preview`/`production` y configuración Firebase por variables preparados.
+- Monitoreo Sentry opcional: sin DSN permanece desactivado y no afecta la app.
+- Expo actualizado a `54.0.36`; Android `versionCode 5`.
+- Suite validada: 21 tests lógicos, 1 de Functions y 106 de reglas; Expo Doctor 18/18.
+
+La guía de despliegue, smoke test y rollback está en [`RELEASE_1.0.8.md`](RELEASE_1.0.8.md).
+
+La explicación breve para clientes y profesionales está en [`GUIA_RAPIDA_CLIENTES.md`](GUIA_RAPIDA_CLIENTES.md).
+
+---
+
 ### v1.0.7 (2026-07-08)
 
 **Sistema de aviso de actualización de la app:**
@@ -239,7 +260,7 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Sistema Demo/Pro | Cuota mensual para Demo, planes Pro con fecha de vencimiento, banner de estado en Inicio |
 | Panel Admin | Dashboard de usuarios, gestión de planes con confirmaciones y conservación de días Pro, buscador por nombre/email/negocio/UID, configuración del aviso de actualización |
 | Aviso de actualización | Modal in-app cuando hay una versión nueva disponible (comparación semver contra `appConfig/updateInfo` en Firestore), configurable desde el Panel Admin |
-| Estabilidad | ErrorBoundary global, logError() centralizado (solo activo en desarrollo), expo-doctor 18/18 ✓ |
+| Estabilidad | ErrorBoundary global, logError() centralizado, Sentry opcional en producción, expo-doctor 18/18 ✓ |
 
 ---
 
@@ -249,6 +270,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 - **Firebase Auth** — autenticación de usuarios
 - **Cloud Firestore** — base de datos en tiempo real
 - **Firebase Storage** — almacenamiento del logo del negocio
+- **Cloud Functions** — eliminación segura y reintentable de cuentas
+- **Sentry** — monitoreo opcional de errores de producción
 - **React Navigation v7** — navegación entre pantallas
 - **React Native Paper v5** — componentes Material Design
 - **expo-print** — generación de PDF desde HTML e impresión
@@ -285,9 +308,13 @@ npx expo start -c
 
 ### Configurar Firebase
 
-El archivo `firebase.config.js` en la raíz del proyecto contiene la configuración de Firebase. Está commiteado en este repositorio para que EAS Build pueda compilar la app.
+`firebase.config.js` acepta las seis variables `EXPO_PUBLIC_FIREBASE_*` documentadas
+en `.env.example`. Deben definirse todas o ninguna; si no existen, usa el proyecto
+actual como fallback para mantener compatibilidad con las instalaciones existentes.
 
-> **Importante:** si vas a hacer un fork o usar este proyecto en un repositorio público, reemplazá las credenciales reales por las de tu propio proyecto Firebase y asegurate de que el repositorio sea privado, o usá [EAS Secrets](https://docs.expo.dev/build-reference/variables/) para no exponer credenciales.
+> La configuración del SDK cliente de Firebase es pública, pero debe separarse por
+> ambiente para no mezclar datos de prueba y producción. Tokens de Sentry y otras
+> credenciales privadas nunca deben llevar el prefijo `EXPO_PUBLIC_`.
 
 Estructura del archivo:
 
@@ -321,6 +348,10 @@ export const storage = getStorage(app);
 ## Build de APK (EAS)
 
 ```bash
+# Preflight obligatorio
+npm test
+npx expo-doctor
+
 # Preview (APK para instalar directamente en Android)
 eas build --platform android --profile preview
 
@@ -332,7 +363,15 @@ eas build --platform android --profile production
 
 ## Reglas de Firestore recomendadas
 
-Las reglas protegen los campos comerciales (`planType`, `pro`, `enabled`, `quoteLimit`) para que solo puedan escribirlos los admins. Los usuarios solo pueden incrementar contadores de presupuestos.
+La única fuente vigente es [`firestore.rules`](firestore.rules). Reemplazá el
+contenido completo en Firebase Console o desplegalo con:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+> **No desplegar el bloque histórico siguiente:** se conserva únicamente como
+> referencia de versiones anteriores y no contiene las protecciones de v1.0.8.
 
 ```
 rules_version = '2';
@@ -405,6 +444,16 @@ service cloud.firestore {
 ---
 
 ## Reglas de Firebase Storage recomendadas
+
+La única fuente vigente es [`storage.rules`](storage.rules). Reemplazá el
+contenido completo en Firebase Console o desplegalo con:
+
+```bash
+firebase deploy --only storage
+```
+
+> **No desplegar el bloque histórico siguiente:** no representa las restricciones
+> de propietario verificado, path único y MIME de v1.0.8.
 
 ```
 rules_version = '2';

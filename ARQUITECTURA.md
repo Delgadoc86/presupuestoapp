@@ -82,6 +82,7 @@ users/{uid}
 ├── proRemainingDays   number     días Pro guardados al hacer downgrade Demo (null si no hay)
 ├── planUpdatedAt      Timestamp  última vez que el admin cambió el plan
 ├── suspendedAt        Timestamp  cuándo fue suspendida la cuenta (null si activa)
+├── deletionPending    boolean    true mientras la Cloud Function elimina la cuenta
 │
 │   — contadores de uso (modificables por el usuario vía transacción) —
 ├── quotesThisMonth    number     presupuestos creados en el mes corriente
@@ -228,7 +229,7 @@ Un documento vacío por cada administrador. ID = Firebase Auth UID.
 admins/{uid}   ← solo su existencia indica que el usuario es admin
 ```
 
-Las reglas de Firestore permiten leer `admins/{uid}` a cualquier usuario autenticado
+Las reglas de Firestore permiten leer `admins/{uid}` a cualquier usuario con email verificado
 (para que el hook `useIsAdmin` funcione en el cliente) pero la escritura está bloqueada (`allow write: if false`).
 
 ---
@@ -241,7 +242,17 @@ logos/
       └── logo.jpg    ← se sobreescribe en cada actualización del logo
 ```
 
-Regla de seguridad: solo el usuario con UID coincidente puede leer y escribir.
+Regla de seguridad: solo el usuario con UID coincidente y email verificado puede
+leer o escribir. Las subidas se limitan a `logo.jpg`, MIME `image/jpeg` y 5 MB.
+
+### Eliminación de cuenta
+
+`deleteCurrentUserAccount` es una Cloud Function callable en `us-central1`.
+Exige una sesión reciente y email verificado, marca `users/{uid}.deletionPending`
+para bloquear escrituras concurrentes y elimina por lotes presupuestos,
+plantillas y clientes. Después elimina perfil, logo, usuario de Auth y documento
+`users/{uid}`. El cliente conserva un fallback temporal solo mientras la Function
+todavía no esté desplegada.
 
 ---
 

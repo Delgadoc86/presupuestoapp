@@ -8,13 +8,23 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(uid) {
       return request.auth.uid == uid;
     }
 
+    function accountAllowsWrites() {
+      return isVerified()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('deletionPending', false) == false;
+    }
+
     // Admin check: el doc admins/{uid} existe → el usuario es admin.
     function isAdmin() {
-      return isSignedIn()
+      return isVerified()
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
@@ -62,6 +72,40 @@ service cloud.firestore {
     function clientFieldsAllowed() {
       return ['userId','name','phone','email','address','notes',
               'archived','archivedAt','createdAt','updatedAt'];
+    }
+
+    function businessProfileFieldsAllowed() {
+      return ['ownerName','businessName','sector','whatsapp','email','address','cuit',
+              'generalConditions','validityDays','logoUrl','updatedAt'];
+    }
+
+    function businessProfileValid(data) {
+      return data.keys().hasOnly(businessProfileFieldsAllowed())
+        && data.get('ownerName', '') is string
+        && data.get('ownerName', '').size() > 0
+        && data.get('ownerName', '').size() <= 120
+        && data.get('businessName', '') is string
+        && data.get('businessName', '').size() <= 120
+        && data.get('sector', '') is string
+        && data.get('sector', '').size() > 0
+        && data.get('sector', '').size() <= 120
+        && data.get('whatsapp', '') is string
+        && data.get('whatsapp', '').size() > 0
+        && data.get('whatsapp', '').size() <= 40
+        && data.get('email', '') is string
+        && data.get('email', '').size() <= 254
+        && data.get('address', '') is string
+        && data.get('address', '').size() <= 300
+        && data.get('cuit', '') is string
+        && data.get('cuit', '').size() <= 30
+        && data.get('generalConditions', '') is string
+        && data.get('generalConditions', '').size() <= 5000
+        && data.get('validityDays', 30) is int
+        && data.get('validityDays', 30) >= 1
+        && data.get('validityDays', 30) <= 365
+        && isNullableString(data.get('logoUrl', null))
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
     }
 
     // ¿clientId referencia un cliente propio del usuario? Usada tanto en la
@@ -207,6 +251,7 @@ service cloud.firestore {
       // cada uno. Un usuario nuevo solo puede nacer como Demo limpio, sin
       // privilegios ni contadores pre-cargados.
       allow create: if isSignedIn() && isOwner(uid)
+        && request.auth.token.email_verified == false
         && request.resource.data.keys().hasOnly(createFieldsAllowed())
         && request.resource.data.keys().hasAll(createFieldsAllowed())
         && request.resource.data.email is string
@@ -239,7 +284,8 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(planFields());
 
       // Dueño: tres caminos, ninguno puede tocar planFields.
-      allow update: if isSignedIn() && isOwner(uid) && (
+      allow update: if isVerified() && isOwner(uid)
+        && resource.data.get('deletionPending', false) == false && (
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(profileFields())
         || isValidQuoteCounterIncrement()
         || isValidFirstTimeCounterInit()
@@ -249,19 +295,28 @@ service cloud.firestore {
       // (auth.service.js) al eliminar la cuenta. La v3 original de esta regla
       // dividió el "allow write" heredado en create/update y omitió delete por
       // error — sin esto, borrar la cuenta queda roto en producción.
-      allow delete: if isSignedIn() && isOwner(uid);
+      allow delete: if isVerified() && isOwner(uid);
+    }
+
+    // Perfil privado del negocio. El documento tiene como ID el UID del dueño.
+    // Se admite merge:true porque la app actualiza el logo por separado.
+    match /businessProfiles/{uid} {
+      allow read: if isVerified() && isOwner(uid);
+      allow create, update: if accountAllowsWrites() && isOwner(uid)
+        && businessProfileValid(request.resource.data);
+      allow delete: if isVerified() && isOwner(uid);
     }
 
     // ── quotes/{quoteId} ────────────────────────────────────────────────────
     match /quotes/{quoteId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isVerified() && resource.data.userId == request.auth.uid;
 
       // ID determinista ${uid}_${quoteNumber}: un batch/transacción solo admite
       // una escritura por documento, así que como máximo hay un incremento
       // válido de lastQuoteNumber por commit — eso limita a un único quoteId
       // válido por commit, cerrando la posibilidad de crear varios quotes con
       // un solo incremento de contador.
-      allow create: if isSignedIn()
+      allow create: if accountAllowsWrites()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'draft'
         && request.resource.data.quoteNumber is int
@@ -298,7 +353,7 @@ service cloud.firestore {
       // presupuesto cuyo cliente fue archivado o incluso borrado, sin quedar
       // bloqueado). Si cambia, el nuevo valor debe ser null o referenciar un
       // cliente propio.
-      allow update: if isSignedIn()
+      allow update: if accountAllowsWrites()
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.quoteNumber == resource.data.quoteNumber
@@ -318,7 +373,7 @@ service cloud.firestore {
         )
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enabled', true) == true;
 
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if accountAllowsWrites() && resource.data.userId == request.auth.uid;
     }
 
     // ── clients/{clientId} ──────────────────────────────────────────────────
@@ -326,9 +381,9 @@ service cloud.firestore {
     // que users/quotes (getAfter, transacciones) porque nada acá gatea un
     // límite de plan ni un valor monetario — es una ficha de contacto.
     match /clients/{clientId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isVerified() && resource.data.userId == request.auth.uid;
 
-      allow create: if isSignedIn()
+      allow create: if accountAllowsWrites()
         && request.resource.data.keys().hasOnly(clientFieldsAllowed())
         && request.resource.data.keys().hasAll(clientFieldsAllowed())
         && request.resource.data.userId == request.auth.uid
@@ -347,7 +402,7 @@ service cloud.firestore {
       // COMPLETO resultante (los campos no tocados por este write se
       // mantienen), así que la misma validación exhaustiva sirve para ambos
       // casos sin necesitar una rama aparte.
-      allow update: if isSignedIn()
+      allow update: if accountAllowsWrites()
         && resource.data.userId == request.auth.uid
         && request.resource.data.keys().hasOnly(clientFieldsAllowed())
         && request.resource.data.keys().hasAll(clientFieldsAllowed())
@@ -369,22 +424,23 @@ service cloud.firestore {
       // clientes del usuario al eliminar la cuenta, mismo criterio que ya
       // aplica a quotes/templates. No hay ninguna forma de disparar esto
       // desde la interfaz salvo eliminando la cuenta entera.
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if accountAllowsWrites() && resource.data.userId == request.auth.uid;
     }
 
     // ── templates/{templateId} ─────────────────────────────────────────────
     // Acceso restringido al usuario dueño de la plantilla.
     match /templates/{templateId} {
-      allow read:   if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read:   if isVerified() && resource.data.userId == request.auth.uid;
+      allow create: if accountAllowsWrites() && request.resource.data.userId == request.auth.uid;
+      allow update: if accountAllowsWrites() && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if accountAllowsWrites() && resource.data.userId == request.auth.uid;
     }
 
     // ── admins/{uid} ────────────────────────────────────────────────────────
     // Solo lectura para usuarios autenticados. Escritura solo desde la consola.
     match /admins/{uid} {
-      allow read:  if isSignedIn();
+      allow read:  if isVerified();
       allow write: if false;
     }
 
