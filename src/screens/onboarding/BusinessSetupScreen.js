@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,11 +18,15 @@ import AppInput from '../../components/common/AppInput';
 import AppLoader from '../../components/common/AppLoader';
 import SectorPickerField from '../../components/common/SectorPickerField';
 import { useBusinessForm } from '../../hooks/useBusiness';
+import { logout } from '../../services/auth.service';
+import { useAppContext } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 import { VALIDITY_DAYS_OPTIONS } from '../../utils/constants';
 
 export default function BusinessSetupScreen() {
   const theme = useTheme();
+  const { showSnackbar } = useAppContext();
+  const [loggingOut, setLoggingOut] = useState(false);
   const { form, updateField, logoUri, pickLogo, errors, loading, save } =
     useBusinessForm(true);
 
@@ -37,9 +41,32 @@ export default function BusinessSetupScreen() {
     );
   }
 
+  function handleLogout() {
+    Alert.alert(
+      'Cerrar sesión',
+      'Los datos que todavía no guardaste se perderán. Podés volver a ingresar con la misma cuenta.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+            } catch {
+              setLoggingOut(false);
+              showSnackbar('No se pudo cerrar la sesión. Intentá nuevamente.', 'error');
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <AppLoader visible={loading} />
+      <AppLoader visible={loading || loggingOut} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -51,9 +78,20 @@ export default function BusinessSetupScreen() {
         >
           {/* Encabezado */}
           <View style={styles.header}>
-            <Text variant="headlineSmall" style={styles.title}>
-              Configurá tu negocio
-            </Text>
+            <View style={styles.titleRow}>
+              <Text variant="headlineSmall" style={styles.title}>
+                Configurá tu negocio
+              </Text>
+              <TouchableOpacity
+                onPress={handleLogout}
+                disabled={loading || loggingOut}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text variant="labelLarge" style={{ color: theme.colors.primary }}>
+                  Cerrar sesión
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text variant="bodyMedium" style={styles.subtitle}>
               Esta información va a aparecer en todos tus presupuestos. El rubro elegido quedará asociado permanentemente a tu cuenta.
             </Text>
@@ -209,7 +247,14 @@ const styles = StyleSheet.create({
   header: {
     gap: 8,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   title: {
+    flex: 1,
     fontWeight: '700',
     color: colors.text,
   },

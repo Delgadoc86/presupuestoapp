@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
   appName: 'PresúFácil',
-  version: '1.0.8',
+  version: '1.0.9',
   supportEmail: 'delgadocdev@hotmail.com',
   demoQuoteLimit: 3,
   proDurations: {

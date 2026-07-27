@@ -91,7 +91,8 @@ export default function AdminUsersScreen({ navigation }) {
       (u.email       ?? '').toLowerCase().includes(term) ||
       (u.ownerName   ?? '').toLowerCase().includes(term) ||
       (u.businessName ?? '').toLowerCase().includes(term) ||
-      (u.id          ?? '').toLowerCase().includes(term)
+      (u.id          ?? '').toLowerCase().includes(term) ||
+      (u.onboardingComplete !== true && 'pendiente configuracion sin nombre'.includes(term))
     );
   }, [users, search]);
 
@@ -341,6 +342,13 @@ export default function AdminUsersScreen({ navigation }) {
             {shortUid(u.id)}{createdAt ? `  ·  Alta: ${createdAt}` : ''}
           </Text>
         </View>
+
+        {u.onboardingComplete !== true && (
+          <View style={styles.onboardingWarning}>
+            <MaterialCommunityIcons name="account-alert-outline" size={15} color={colors.warning} />
+            <Text style={styles.onboardingWarningText}>Perfil de negocio pendiente</Text>
+          </View>
+        )}
 
         {/* ── Último acceso ── */}
         <View style={styles.metaRow}>
@@ -640,6 +648,16 @@ const styles = StyleSheet.create({
   // ── Meta rows ──
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { color: colors.textSecondary, fontSize: 12 },
+  onboardingWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: `${colors.warning}18`,
+  },
+  onboardingWarningText: { color: colors.warning, fontWeight: '700', fontSize: 12 },
 
   expiryRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   expiryActive:  { color: '#2F9E44', fontWeight: '600', fontSize: 12 },

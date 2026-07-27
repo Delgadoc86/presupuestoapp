@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
-  Linking,
 } from 'react-native';
 import { Text, Surface, Button, Dialog, Portal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,8 +14,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppLoader from '../../components/common/AppLoader';
 import QuoteStatusBadge from '../../components/quotes/QuoteStatusBadge';
 import { updateQuoteStatus, deleteQuote } from '../../services/quotes.service';
-import { shareQuotePdf, printQuotePdf } from '../../services/pdf.service';
-import { buildWhatsAppMessage, buildWhatsAppUrl, isValidWhatsAppPhone } from '../../utils/whatsappMessage';
+import { shareQuotePdf, shareQuotePdfToWhatsApp, printQuotePdf } from '../../services/pdf.service';
+import { isValidWhatsAppPhone } from '../../utils/whatsappMessage';
 import { shouldPromptAfterWhatsAppReturn } from '../../utils/whatsappFollowUp';
 import { getStatusActions } from '../../utils/quoteStatus';
 import { useQuotes } from '../../hooks/useQuotes';
@@ -46,7 +45,7 @@ export default function QuoteDetailScreen({ navigation, route }) {
         awaitingWhatsAppReturnRef.current = false;
         Alert.alert(
           '¿Pudiste enviar el presupuesto?',
-          'Si ya se lo mandaste al cliente por WhatsApp, marcalo como enviado.',
+          'Si WhatsApp abrió el chat con el PDF adjunto y ya lo enviaste, marcalo como enviado.',
           [
             { text: 'Todavía no', style: 'cancel' },
             { text: 'Sí, marcar como enviado', onPress: () => runStatusChange('sent') },
@@ -128,21 +127,32 @@ export default function QuoteDetailScreen({ navigation, route }) {
     }
   }
 
-  // ── WhatsApp — dos pasos explícitos, ver diseño (límite real de WhatsApp:
-  // el link de texto y el adjunto de archivo son mutuamente excluyentes) ──
-  async function handleSendWhatsAppMessage() {
+  // ── WhatsApp — genera el archivo y lo dirige al número del cliente ──
+  async function handleSendWhatsAppPdf() {
     if (!isValidWhatsAppPhone(quote.client?.phone)) {
       showSnackbar('El teléfono del cliente no parece válido para WhatsApp', 'error');
       return;
     }
-    const message = buildWhatsAppMessage(quote);
-    const url = buildWhatsAppUrl(quote.client.phone, message);
+
+    setLoading(true);
     try {
       awaitingWhatsAppReturnRef.current = true;
-      await Linking.openURL(url);
-    } catch {
+      const result = await shareQuotePdfToWhatsApp(quote, quote.business, quote.client.phone);
+      if (result?.directToClient === false) {
+        awaitingWhatsAppReturnRef.current = false;
+        showSnackbar('Elegí WhatsApp y el contacto del cliente para enviar el PDF', 'info');
+      }
+    } catch (error) {
       awaitingWhatsAppReturnRef.current = false;
-      showSnackbar('No se pudo abrir WhatsApp. ¿Está instalado?', 'error');
+      if (error?.code === 'whatsapp_not_installed') {
+        showSnackbar('No encontramos WhatsApp ni WhatsApp Business instalados', 'error');
+      } else if (error?.code === 'native_share_unavailable') {
+        showSnackbar('Instalá la versión 1.0.9 para enviar el PDF directo por WhatsApp', 'error');
+      } else {
+        showSnackbar('No se pudo adjuntar el PDF en WhatsApp', 'error');
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -452,16 +462,22 @@ export default function QuoteDetailScreen({ navigation, route }) {
         </Button>
 
         {!!quote.client?.phone && (
-          <TouchableOpacity
-            style={styles.whatsappBtn}
-            onPress={handleSendWhatsAppMessage}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="whatsapp" size={22} color="#fff" />
-            <Text variant="labelLarge" style={styles.whatsappLabel}>
-              Enviar mensaje por WhatsApp
+          <View style={styles.whatsappAction}>
+            <TouchableOpacity
+              style={styles.whatsappBtn}
+              onPress={handleSendWhatsAppPdf}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="file-pdf-box" size={22} color="#fff" />
+              <MaterialCommunityIcons name="whatsapp" size={22} color="#fff" />
+              <Text variant="labelLarge" style={styles.whatsappLabel}>
+                Enviar PDF por WhatsApp
+              </Text>
+            </TouchableOpacity>
+            <Text variant="bodySmall" style={styles.whatsappHint}>
+              Se abrirá el chat de {quote.client.name} ({quote.client.phone}) con el PDF adjunto.
             </Text>
-          </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -635,9 +651,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
   },
+  whatsappAction: {
+    gap: 6,
+  },
   whatsappLabel: {
     color: '#fff',
     fontWeight: '700',
+  },
+  whatsappHint: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   // Dialog
   dialog: {

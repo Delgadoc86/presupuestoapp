@@ -7,6 +7,7 @@ import {
   deleteUser,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  updateProfile,
 } from 'firebase/auth';
 import {
   doc,
@@ -85,6 +86,21 @@ export async function registerWithEmail(email, password) {
   // Enviar email de verificación — no interrumpe el registro si falla
   await sendEmailVerification(user).catch(() => {});
   return user;
+}
+
+/**
+ * Mantiene el nombre visible de Firebase Authentication sincronizado con el
+ * nombre del responsable guardado en Firestore. No se usa como fuente de
+ * autorización ni reemplaza a users/{uid}.ownerName.
+ *
+ * @returns {Promise<boolean>} true si fue necesario actualizarlo.
+ */
+export async function syncAuthDisplayName(user, displayName) {
+  const normalizedName = typeof displayName === 'string' ? displayName.trim() : '';
+  if (!user || !normalizedName || user.displayName === normalizedName) return false;
+
+  await updateProfile(user, { displayName: normalizedName });
+  return true;
 }
 
 export async function sendVerificationEmail() {

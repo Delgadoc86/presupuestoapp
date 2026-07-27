@@ -2,7 +2,7 @@
   "expo": {
     "name": "PresúFácil",
     "slug": "presufacil",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,8 @@
     },
     "android": {
       "package": "com.delgadodev.presufacil",
-      "versionCode": 5,
+      "versionCode": 6,
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1D4ED8",
@@ -49,7 +50,19 @@
           "microphonePermission": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "react-native-share",
+        {
+          "ios": [
+            "whatsapp"
+          ],
+          "android": [
+            "com.whatsapp",
+            "com.whatsapp.w4b"
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

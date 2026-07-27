@@ -22,6 +22,7 @@ import {
   StyleSheet,
   Modal,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -126,7 +127,7 @@ export default function ClientPickerSheet({ visible, onClose, onSelect }) {
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.kbWrapper}
         >
           <View style={styles.sheet}>
@@ -198,26 +199,36 @@ export default function ClientPickerSheet({ visible, onClose, onSelect }) {
                   <Text variant="titleMedium" style={styles.title}>Crear cliente rápido</Text>
                   <View style={{ width: 22 }} />
                 </View>
-                <AppInput
-                  label="Nombre *"
-                  value={quickName}
-                  onChangeText={t => { setQuickName(t); setQuickNameError(null); }}
-                  error={quickNameError}
-                  autoCapitalize="words"
-                  autoFocus
-                />
-                <AppInput
-                  label="Teléfono (opcional)"
-                  value={quickPhone}
-                  onChangeText={setQuickPhone}
-                  keyboardType="phone-pad"
-                />
-                <Text variant="bodySmall" style={styles.hint}>
-                  Email, dirección y notas se pueden completar después desde la ficha del cliente.
-                </Text>
-                <Button mode="contained" onPress={saveQuickClient} loading={saving} disabled={saving} style={styles.saveBtn}>
-                  Guardar y usar
-                </Button>
+                <ScrollView
+                  style={styles.formScroll}
+                  contentContainerStyle={styles.formContent}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  showsVerticalScrollIndicator={false}
+                  automaticallyAdjustKeyboardInsets
+                >
+                  <AppInput
+                    label="Nombre *"
+                    value={quickName}
+                    onChangeText={t => { setQuickName(t); setQuickNameError(null); }}
+                    error={quickNameError}
+                    autoCapitalize="words"
+                    autoFocus
+                  />
+                  <AppInput
+                    label="Teléfono / WhatsApp (opcional)"
+                    value={quickPhone}
+                    onChangeText={setQuickPhone}
+                    keyboardType="phone-pad"
+                    placeholder="Ej. 261 6565656"
+                  />
+                  <Text variant="bodySmall" style={styles.hint}>
+                    Email, dirección y notas se pueden completar después desde la ficha del cliente.
+                  </Text>
+                  <Button mode="contained" onPress={saveQuickClient} loading={saving} disabled={saving} style={styles.saveBtn}>
+                    Guardar y usar
+                  </Button>
+                </ScrollView>
               </>
             )}
 
@@ -230,39 +241,49 @@ export default function ClientPickerSheet({ visible, onClose, onSelect }) {
                   <Text variant="titleMedium" style={styles.title}>Cliente ocasional</Text>
                   <View style={{ width: 22 }} />
                 </View>
-                <Text variant="bodySmall" style={styles.hint}>
-                  Estos datos quedan solo en este presupuesto — no se crea una ficha de cliente.
-                </Text>
-                <AppInput
-                  label="Nombre *"
-                  value={occasional.name}
-                  onChangeText={t => { setOccasional(p => ({ ...p, name: t })); setOccNameError(null); }}
-                  error={occNameError}
-                  autoCapitalize="words"
-                  autoFocus
-                />
-                <AppInput
-                  label="Teléfono (opcional)"
-                  value={occasional.phone}
-                  onChangeText={t => setOccasional(p => ({ ...p, phone: t }))}
-                  keyboardType="phone-pad"
-                />
-                <AppInput
-                  label="Email (opcional)"
-                  value={occasional.email}
-                  onChangeText={t => setOccasional(p => ({ ...p, email: t }))}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <AppInput
-                  label="Dirección (opcional)"
-                  value={occasional.address}
-                  onChangeText={t => setOccasional(p => ({ ...p, address: t }))}
-                  autoCapitalize="sentences"
-                />
-                <Button mode="contained" onPress={useOccasionalClient} style={styles.saveBtn}>
-                  Usar este cliente
-                </Button>
+                <ScrollView
+                  style={styles.formScroll}
+                  contentContainerStyle={styles.formContent}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  showsVerticalScrollIndicator={false}
+                  automaticallyAdjustKeyboardInsets
+                >
+                  <Text variant="bodySmall" style={styles.hint}>
+                    Estos datos quedan solo en este presupuesto — no se crea una ficha de cliente.
+                  </Text>
+                  <AppInput
+                    label="Nombre *"
+                    value={occasional.name}
+                    onChangeText={t => { setOccasional(p => ({ ...p, name: t })); setOccNameError(null); }}
+                    error={occNameError}
+                    autoCapitalize="words"
+                    autoFocus
+                  />
+                  <AppInput
+                    label="Teléfono / WhatsApp (opcional)"
+                    value={occasional.phone}
+                    onChangeText={t => setOccasional(p => ({ ...p, phone: t }))}
+                    keyboardType="phone-pad"
+                    placeholder="Ej. 261 6565656"
+                  />
+                  <AppInput
+                    label="Email (opcional)"
+                    value={occasional.email}
+                    onChangeText={t => setOccasional(p => ({ ...p, email: t }))}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <AppInput
+                    label="Dirección (opcional)"
+                    value={occasional.address}
+                    onChangeText={t => setOccasional(p => ({ ...p, address: t }))}
+                    autoCapitalize="sentences"
+                  />
+                  <Button mode="contained" onPress={useOccasionalClient} style={styles.saveBtn}>
+                    Usar este cliente
+                  </Button>
+                </ScrollView>
               </>
             )}
           </View>
@@ -279,14 +300,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   kbWrapper: {
+    flex: 1,
     width: '100%',
+    justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    maxHeight: '80%',
+    height: '86%',
+    maxHeight: '86%',
     gap: 12,
   },
   handle: {
@@ -325,7 +349,8 @@ const styles = StyleSheet.create({
   },
 
   list: {
-    maxHeight: 260,
+    flex: 1,
+    minHeight: 0,
   },
   emptyText: {
     textAlign: 'center',
@@ -372,6 +397,14 @@ const styles = StyleSheet.create({
   },
   hint: {
     color: colors.textSecondary,
+  },
+  formScroll: {
+    flex: 1,
+  },
+  formContent: {
+    flexGrow: 1,
+    gap: 12,
+    paddingBottom: 12,
   },
   saveBtn: {
     marginTop: 8,

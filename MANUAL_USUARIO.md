@@ -102,7 +102,8 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 
 | Campo | Obligatorio | Descripción |
 |---|---|---|
-| Nombre del negocio | Sí | El nombre que verán tus clientes |
+| Nombre completo | Sí | Nombre del responsable o titular |
+| Nombre del negocio | No | Marca o nombre comercial; si queda vacío se usa el nombre del responsable |
 | Rubro / Actividad | Sí | Seleccioná de la lista predefinida (20 rubros) o elegí "Otro" para ingresar el tuyo. **Esta elección es permanente** (ver nota abajo) |
 | WhatsApp | Sí | Número de contacto principal |
 | Email | No | Email de contacto del negocio |
@@ -115,6 +116,9 @@ La primera vez que iniciás sesión, la app te pide que configures el perfil de 
 > **Importante — El rubro es una elección permanente:** el oficio o rubro que elijas quedará asociado a tu cuenta y **no podrá modificarse** más adelante. Esta elección define tus plantillas, historial y configuración inicial. Si en el futuro necesitás usar PresúFácil con otro rubro, deberás eliminar tu cuenta actual, perder toda la información guardada y crear una nueva. Elegí con cuidado.
 
 Al tocar **"Guardar y comenzar"**, la app te va a mostrar un resumen de esta advertencia y te pedirá confirmar antes de continuar.
+
+Si necesitás volver al ingreso, tocá **"Cerrar sesión"** en la parte superior.
+No hace falta crear otra cuenta: podés ingresar nuevamente con el mismo email.
 
 **Para subir el logo:**
 1. Tocá el ícono de cámara sobre el logo
@@ -246,6 +250,9 @@ Cada presupuesto puede estar en uno de estos estados:
 4. Se abre el menú de compartir de tu teléfono
 5. Elegí cómo compartirlo: Gmail, Drive, WhatsApp, etc.
 
+Este botón es la alternativa general: abre el selector del teléfono y no elige
+un destinatario automáticamente.
+
 El PDF incluye:
 - Logo de tu negocio (si lo tenés cargado en el perfil)
 - Datos de tu negocio (nombre, WhatsApp, email, dirección, CUIT)
@@ -260,19 +267,25 @@ El PDF incluye:
 
 ## 11. Enviar por WhatsApp
 
-Esta función abre WhatsApp con un mensaje profesional ya armado que incluye:
-- El nombre del cliente
-- El número de presupuesto
-- El total
-- La fecha de validez
+Esta función genera el presupuesto en PDF y abre directamente el chat del
+número guardado en el presupuesto con el archivo adjunto. Funciona tanto con
+WhatsApp como con WhatsApp Business en Android.
 
 **Pasos:**
 1. Abrí el detalle del presupuesto
-2. Tocá el botón verde **"Enviar por WhatsApp"**
-3. WhatsApp se abre con el mensaje pre-armado y el número del cliente ya cargado
-4. Tocá enviar
+2. Verificá el nombre y el teléfono que aparecen debajo del botón verde
+3. Tocá **"Enviar PDF por WhatsApp"**
+4. WhatsApp abre el chat del cliente con el PDF adjunto
+5. Revisá el archivo y tocá enviar
 
-> Necesitás tener WhatsApp instalado y que el cliente tenga número de teléfono cargado.
+> Necesitás tener WhatsApp o WhatsApp Business instalado y que el cliente tenga
+> un teléfono válido con código de área. Los formatos argentinos habituales
+> (`261...`, `0261...`, `0261 15...` o `+54 9...`) se normalizan
+> automáticamente. La app no pulsa el último botón **Enviar** por vos: esa
+> confirmación queda siempre bajo tu control.
+
+En iPhone, por limitaciones del sistema, se abre el selector de compartir; allí
+hay que elegir WhatsApp y luego el contacto.
 
 ---
 
@@ -438,6 +451,12 @@ Podés hacerlo directamente desde la app: **Ajustes → Cuenta → Eliminar cuen
 
 **¿Puedo cambiar el rubro de mi negocio?**
 No. El rubro que elegiste al configurar tu negocio por primera vez queda asociado permanentemente a tu cuenta. Si necesitás operar con otro rubro, deberás eliminar tu cuenta actual (perdés todos los datos: presupuestos, plantillas, historial) y crear una nueva desde cero.
+
+**¿Qué hago si la app vuelve a pedirme los datos del negocio?**
+No crees otra cuenta. Tocá **"Cerrar sesión"** en esa pantalla, volvé a
+ingresar con el mismo email y completá nuevamente solamente los datos que no
+llegaron a guardarse. Si el problema continúa, enviá a soporte una captura, el
+email de la cuenta y la hora aproximada del intento. Nunca envíes tu contraseña.
 
 **¿La app es gratuita?**
 La app se puede usar gratis con el Plan Demo, que permite hasta 3 presupuestos por mes. El Plan Pro sin límites es de pago. Contactanos para más información.

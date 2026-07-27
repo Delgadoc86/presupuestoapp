@@ -8,14 +8,15 @@
  *   - emailVerified → refleja auth.currentUser.emailVerified; se actualiza
  *                     vía reloadUser() porque onAuthStateChanged no se dispara
  *                     cuando emailVerified cambia server-side
- *   - reloadUser()  → llama reload() en Firebase, actualiza emailVerified,
- *                     retorna el nuevo valor (true/false)
+ *   - reloadUser()  → recarga el usuario y fuerza un ID token nuevo antes
+ *                     de habilitar escrituras que exigen email_verified=true
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase.config';
 import { logError } from '../utils/errorUtils';
+import { reloadEmailVerification } from '../utils/authVerification';
 
 const AuthContext = createContext(null);
 
@@ -63,9 +64,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function reloadUser() {
-    if (!auth.currentUser) return false;
-    await auth.currentUser.reload();
-    const verified = auth.currentUser.emailVerified;
+    const verified = await reloadEmailVerification(auth.currentUser);
     setEmailVerified(verified);
     return verified;
   }

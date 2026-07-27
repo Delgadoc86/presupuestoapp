@@ -4,9 +4,11 @@ import { useAuthContext } from '../context/AuthContext';
 import { useBusinessContext } from '../context/BusinessContext';
 import { useAppContext } from '../context/AppContext';
 import { saveBusinessProfile, completeOnboarding } from '../services/business.service';
+import { syncAuthDisplayName } from '../services/auth.service';
 import { uploadLogo, deleteLogo as deleteLogoFromStorage } from '../services/storage.service';
 import { initDefaultTemplate } from '../services/templates.service';
-import { logError } from '../utils/errorUtils';
+import { getFriendlyErrorMessage, logError } from '../utils/errorUtils';
+import { runWithFreshAuthTokenRetry } from '../utils/authVerification';
 
 const EMPTY_FORM = {
   ownerName: '',
@@ -76,8 +78,10 @@ export function useBusinessForm(isOnboarding = false) {
     if (!user?.uid) return;
     setLoading(true);
     try {
-      await deleteLogoFromStorage(user.uid);
-      await saveBusinessProfile(user.uid, { logoUrl: null });
+      await runWithFreshAuthTokenRetry(user, () => deleteLogoFromStorage(user.uid));
+      await runWithFreshAuthTokenRetry(user, () =>
+        saveBusinessProfile(user.uid, { logoUrl: null })
+      );
       setLogoUri(null);
       showSnackbar('Logo eliminado', 'success');
     } catch (error) {
@@ -109,7 +113,9 @@ export function useBusinessForm(isOnboarding = false) {
       let logoUrl = business?.logoUrl ?? null;
       if (logoUri && !logoUri.startsWith('http')) {
         // Es una imagen local nueva → subir a Storage
-        logoUrl = await uploadLogo(user.uid, logoUri);
+        logoUrl = await runWithFreshAuthTokenRetry(user, () =>
+          uploadLogo(user.uid, logoUri)
+        );
       } else if (logoUri && logoUri.startsWith('http')) {
         // Ya es una URL remota → mantenerla
         logoUrl = logoUri;
@@ -117,19 +123,30 @@ export function useBusinessForm(isOnboarding = false) {
 
       const data = { ...form, logoUrl };
 
+      // Firebase Auth usa displayName solo como dato visible auxiliar. Si esta
+      // sincronización falla, Firestore sigue siendo la fuente principal y el
+      // onboarding no debe quedar bloqueado.
+      await syncAuthDisplayName(user, data.ownerName).catch(error =>
+        logError('syncAuthDisplayName', error)
+      );
+
       if (isOnboarding) {
-        await completeOnboarding(user.uid, data);
+        await runWithFreshAuthTokenRetry(user, () =>
+          completeOnboarding(user.uid, data)
+        );
         // Crear plantilla base del rubro si el usuario no tiene ninguna.
         // Se ejecuta en background: si falla no interrumpe el onboarding.
         initDefaultTemplate(user.uid, form.sector);
       } else {
-        await saveBusinessProfile(user.uid, data);
+        await runWithFreshAuthTokenRetry(user, () =>
+          saveBusinessProfile(user.uid, data)
+        );
         showSnackbar('Cambios guardados correctamente', 'success');
       }
       return true;
     } catch (error) {
       logError('saveProfile', error);
-      showSnackbar('No se pudo guardar. Revisá tu conexión.', 'error');
+      showSnackbar(getFriendlyErrorMessage(error), 'error');
       return false;
     } finally {
       setLoading(false);

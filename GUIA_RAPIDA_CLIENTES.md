@@ -22,6 +22,11 @@ Esta versión es de prueba y se distribuye de forma privada; todavía no está p
 
 Nunca compartas tu contraseña con quien te brinda soporte.
 
+Si la app vuelve a pedirte los datos del negocio, no crees otra cuenta. Tocá
+**Cerrar sesión**, ingresá con el mismo email y completá otra vez los datos que
+no se hayan guardado. Si vuelve a fallar, enviá una captura y la hora del intento,
+pero nunca tu contraseña.
+
 ## 3. Crear y enviar un presupuesto
 
 1. Entrá en **Clientes** y registrá a la persona o empresa.
@@ -29,7 +34,13 @@ Nunca compartas tu contraseña con quien te brinda soporte.
 3. Seleccioná el cliente y agregá los productos o servicios.
 4. Indicá cantidades, precios, descuentos, impuestos, validez y observaciones según corresponda.
 5. Revisá los datos y guardá el presupuesto.
-6. Generá el PDF y compartilo por WhatsApp, correo u otra aplicación del teléfono.
+6. Para mandarlo al número del cliente, tocá **Enviar PDF por WhatsApp**: se
+   abre su chat con el archivo adjunto y solo falta confirmar **Enviar**. Usá
+   **Compartir PDF** si preferís correo, Drive u otra aplicación.
+
+Al cargar el teléfono del cliente incluí el código de área. La app reconoce los
+formatos argentinos más comunes y los convierte al formato internacional de
+WhatsApp.
 
 Antes de enviarlo, comprobá especialmente el nombre del cliente, los importes, la moneda y la fecha de validez.
 

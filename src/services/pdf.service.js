@@ -1,13 +1,13 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { buildQuoteHTML } from '../utils/pdfTemplate';
+import { normalizePhoneForWhatsApp, isValidWhatsAppPhone } from '../utils/whatsappMessage';
 import { logError } from '../utils/errorUtils';
 
-// buildWhatsAppMessage/buildWhatsAppUrl/etc. viven en utils/whatsappMessage.js
-// (sin dependencias de React Native/Expo, para poder testearlas con Node
-// puro) — este archivo se queda solo con lo que genera/comparte el PDF.
+// La normalización del teléfono vive en una utilidad pura para poder probarla
+// con Node; este archivo concentra la generación y el uso compartido del PDF.
 
 export function sanitizeFileName(str) {
   return (str ?? '')
@@ -93,6 +93,89 @@ export async function shareQuotePdf(quote, business) {
     dialogTitle: fileName,
     UTI: 'com.adobe.pdf',
   });
+}
+
+function sharingError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function getNativeShareModule() {
+  try {
+    // Carga diferida: la app sigue abriendo en Expo Go, aunque el envío
+    // directo requiere un APK/AAB nuevo que incluya este módulo nativo.
+    const nativeShare = require('react-native-share');
+    return nativeShare.default ?? nativeShare;
+  } catch (error) {
+    logError('pdf.getNativeShareModule', error);
+    throw sharingError(
+      'native_share_unavailable',
+      'Esta instalación no incluye el envío directo por WhatsApp'
+    );
+  }
+}
+
+async function isWhatsAppPackageInstalled(nativeShare, packageName) {
+  try {
+    const result = await nativeShare.isPackageInstalled(packageName);
+    return result?.isInstalled === true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveWhatsAppSocial(nativeShare) {
+  if (Platform.OS !== 'android') return nativeShare.Social.WHATSAPP;
+
+  if (await isWhatsAppPackageInstalled(nativeShare, 'com.whatsapp')) {
+    return nativeShare.Social.WHATSAPP;
+  }
+  if (await isWhatsAppPackageInstalled(nativeShare, 'com.whatsapp.w4b')) {
+    return nativeShare.Social.WHATSAPPBUSINESS;
+  }
+
+  throw sharingError('whatsapp_not_installed', 'WhatsApp no está instalado');
+}
+
+/**
+ * Genera el PDF y abre el chat del número indicado con el archivo adjunto.
+ * En Android usa la integración nativa de WhatsApp/WhatsApp Business. No se
+ * agrega texto porque WhatsApp no admite de forma confiable texto + archivo
+ * en la misma intención de compartir.
+ */
+export async function shareQuotePdfToWhatsApp(quote, business, phone) {
+  if (!isValidWhatsAppPhone(phone)) {
+    throw sharingError('invalid_whatsapp_phone', 'El teléfono no es válido para WhatsApp');
+  }
+
+  // iOS no permite dirigir de forma confiable un adjunto a un número. Se
+  // conserva allí el selector nativo de archivos como alternativa segura.
+  if (Platform.OS !== 'android') {
+    await shareQuotePdf(quote, business);
+    return { directToClient: false };
+  }
+
+  const nativeShare = getNativeShareModule();
+  const social = await resolveWhatsAppSocial(nativeShare);
+  const { finalUri, fileName } = await generateQuotePdfFile(quote, business);
+
+  // react-native-share necesita una ruta de caché accesible por FileProvider
+  // en Android reciente. El nombre final se conserva para el adjunto.
+  const shareUri = `${FileSystem.cacheDirectory}${Date.now()}_${fileName}`;
+  await FileSystem.copyAsync({ from: finalUri, to: shareUri });
+
+  await nativeShare.shareSingle({
+    title: fileName,
+    social,
+    whatsAppNumber: normalizePhoneForWhatsApp(phone),
+    url: shareUri,
+    type: 'application/pdf',
+    filename: fileName,
+    useInternalStorage: true,
+  });
+
+  return { directToClient: true };
 }
 
 /** Abre el dialogo de impresion del sistema. No usa Sharing. */

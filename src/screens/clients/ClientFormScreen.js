@@ -97,10 +97,11 @@ export default function ClientFormScreen({ navigation, route }) {
               returnKeyType="next"
             />
             <AppInput
-              label="Teléfono (opcional)"
+              label="Teléfono / WhatsApp (opcional)"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
+              placeholder="Ej. 261 6565656"
               returnKeyType="next"
             />
             <AppInput

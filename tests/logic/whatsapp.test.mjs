@@ -1,46 +1,14 @@
 /**
- * Tests puros (sin emulador) del mensaje y la validación de teléfono de
- * WhatsApp — incluye cliente ocasional y cliente sin teléfono.
+ * Tests puros (sin emulador) de limpieza, normalización y validación del
+ * teléfono que recibirá el PDF por WhatsApp.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildWhatsAppMessage,
-  buildWhatsAppUrl,
   cleanPhoneForWhatsApp,
+  normalizePhoneForWhatsApp,
   isValidWhatsAppPhone,
 } from '../../src/utils/whatsappMessage.js';
-
-const BASE_QUOTE = {
-  quoteNumber: 12,
-  total: 15000,
-  client: { name: 'Juan Pérez', phone: '+54 9 11 2233-4455', email: null, address: null },
-  business: { businessName: 'Electricidad Gómez' },
-};
-
-test('el mensaje incluye nombre del cliente, número de presupuesto, negocio y total', () => {
-  const msg = buildWhatsAppMessage(BASE_QUOTE);
-  assert.match(msg, /Juan Pérez/);
-  assert.match(msg, /#0012/);
-  assert.match(msg, /Electricidad Gómez/);
-  assert.match(msg, /\$\s?15\.000/);
-});
-
-test('sin nombre de negocio (freelancer sin businessName), el mensaje no lo menciona vacío', () => {
-  const quote = { ...BASE_QUOTE, business: { businessName: '' } };
-  const msg = buildWhatsAppMessage(quote);
-  assert.doesNotMatch(msg, / de \./); // no debe quedar "... presupuesto #0012 de ."
-});
-
-test('cliente ocasional (sin ficha guardada, clientId null) arma el mismo mensaje', () => {
-  const occasionalQuote = {
-    ...BASE_QUOTE,
-    clientId: null,
-    client: { name: 'Cliente Ocasional', phone: '01122334455', email: null, address: null },
-  };
-  const msg = buildWhatsAppMessage(occasionalQuote);
-  assert.match(msg, /Cliente Ocasional/);
-});
 
 test('formatos válidos de teléfono', () => {
   assert.equal(isValidWhatsAppPhone('+54 9 11 2233-4455'), true);
@@ -61,7 +29,22 @@ test('cleanPhoneForWhatsApp deja solo dígitos', () => {
   assert.equal(cleanPhoneForWhatsApp(null), '');
 });
 
-test('buildWhatsAppUrl arma el link wa.me con el texto codificado', () => {
-  const url = buildWhatsAppUrl('+54 9 11 2233-4455', 'Hola!');
-  assert.equal(url, 'https://wa.me/5491122334455?text=Hola!');
+test('normaliza un número argentino local al formato internacional de WhatsApp', () => {
+  assert.equal(normalizePhoneForWhatsApp('261 656-5656'), '5492616565656');
+  assert.equal(normalizePhoneForWhatsApp('0261 656-5656'), '5492616565656');
+});
+
+test('normaliza el formato argentino antiguo con prefijo 15', () => {
+  assert.equal(normalizePhoneForWhatsApp('0261 15 656-5656'), '5492616565656');
+  assert.equal(normalizePhoneForWhatsApp('011 15 2233-4455'), '5491122334455');
+});
+
+test('conserva un número argentino ya internacional', () => {
+  assert.equal(normalizePhoneForWhatsApp('+54 9 261 656-5656'), '5492616565656');
+  assert.equal(normalizePhoneForWhatsApp('54 9 261 656-5656'), '5492616565656');
+});
+
+test('conserva códigos internacionales explícitos de otros países', () => {
+  assert.equal(normalizePhoneForWhatsApp('+1 202 555 0147'), '12025550147');
+  assert.equal(normalizePhoneForWhatsApp('001 202 555 0147'), '12025550147');
 });

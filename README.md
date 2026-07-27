@@ -7,6 +7,35 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.9 (2026-07-27)
+
+**Corrección del alta y recuperación del onboarding:**
+
+- Después de verificar el correo, la app fuerza la renovación del ID token
+  antes de habilitar escrituras protegidas por reglas de Firebase.
+- Las escrituras de perfil y logo reintentan una sola vez cuando detectan un
+  token autenticado anterior a la verificación.
+- La pantalla de configuración del negocio permite cerrar sesión, evitando que
+  una cuenta con perfil pendiente quede atrapada sin salida.
+- `ownerName` se sincroniza con `displayName` de Firebase Authentication sin
+  convertirlo en fuente de autorización ni bloquear el guardado principal.
+- El panel admin identifica “Perfil de negocio pendiente” y permite encontrar
+  esos usuarios buscando `pendiente`, `configuracion` o `sin nombre`.
+- Los errores de guardado muestran el motivo correspondiente de Firebase.
+- El selector de clientes es más alto; los formularios rápido/ocasional se
+  desplazan y Android redimensiona la pantalla cuando aparece el teclado.
+- **Enviar PDF por WhatsApp** genera el archivo y abre el chat del número del
+  cliente en WhatsApp o WhatsApp Business; los números argentinos locales se
+  convierten automáticamente al formato internacional.
+- Se agrega `react-native-share`; esta función requiere un APK/AAB 1.0.9 nuevo
+  y no está disponible dentro del binario de Expo Go.
+- Android actualizado a `versionCode 6`.
+
+La investigación, recuperación de usuarios, despliegue y smoke test están en
+[`RELEASE_1.0.9.md`](RELEASE_1.0.9.md).
+
+---
+
 ### v1.0.8 (2026-07-24)
 
 **Release de estabilización para distribución local:**
@@ -253,7 +282,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 | Nuevo presupuesto | Datos del cliente, ítems con descripción/cantidad/precio (validados), descuento fijo o porcentual, anticipo, notas, máximo 50 ítems |
 | Historial | Listado paginado (20 por página) con búsqueda normalizada y filtros por estado y rango de fecha vía Firestore |
 | Detalle de presupuesto | Vista completa, cambio de estado, edición, duplicación, eliminación |
-| Compartir PDF | Genera PDF profesional con logo base64, abre selector del sistema (WhatsApp, Gmail, Drive, etc.) |
+| Compartir PDF | Genera PDF profesional con logo base64 y abre el selector del sistema (WhatsApp, Gmail, Drive, etc.) |
+| PDF directo por WhatsApp | En Android detecta WhatsApp/WhatsApp Business, normaliza el teléfono argentino y abre el chat del cliente con el PDF adjunto |
 | Imprimir / Guardar PDF | Abre el diálogo de impresión del sistema; también permite guardar como PDF |
 | Plantillas | Ítems predefinidos reutilizables con 30+ plantillas base por rubro; CRUD completo con reordenamiento |
 | Ajustes | Gestión del perfil del negocio y de la cuenta de usuario |
@@ -276,6 +306,8 @@ PresúFácil permite a cualquier negocio o profesional independiente:
 - **React Native Paper v5** — componentes Material Design
 - **expo-print** — generación de PDF desde HTML e impresión
 - **expo-sharing** — compartición de archivos via share sheet del sistema
+- **react-native-share** — PDF dirigido al chat del cliente en WhatsApp/WhatsApp Business
+- **expo-build-properties** — soporte del plugin nativo de compartición en EAS/prebuild
 - **expo-file-system** (legacy) — copia y gestión de archivos locales
 - **expo-application** — versión real del binario nativo instalado (aviso de actualización)
 - **EAS Build** — builds de APK/AAB en la nube
@@ -305,6 +337,10 @@ npm install
 # 3. Iniciar la app en desarrollo
 npx expo start -c
 ```
+
+Expo Go sirve para revisar el resto de la interfaz, pero no contiene
+`react-native-share`. Para probar **Enviar PDF por WhatsApp** hay que instalar
+un development build o el APK/AAB 1.0.9 generado por EAS.
 
 ### Configurar Firebase
 
