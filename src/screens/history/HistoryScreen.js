@@ -441,6 +441,7 @@ export default function HistoryScreen({ navigation, route }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterBarWrapper}
         contentContainerStyle={styles.filterBar}
       >
         {/* Pill: Necesitan seguimiento (enviados + vencidos, atajo de un toque) */}
@@ -721,11 +722,15 @@ const styles = StyleSheet.create({
   searchOutline: { borderRadius: 16, borderColor: colors.border },
 
   // ── Barra de filtros compacta ──
+  filterBarWrapper: {
+    height: 50,
+    flexGrow: 0,
+    marginBottom: 20,
+  },
   filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 12,
     gap: 8,
   },
   filterPill: {
