@@ -9,7 +9,7 @@ export const APP_CONFIG = {
     yearly: 365,
   },
   pdf: {
-    firstPageItems: 12,
-    itemsPerPage: 20,
+    firstPageItems: 11,
+    itemsPerPage: 18,
   },
 };

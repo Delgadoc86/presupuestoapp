@@ -25,7 +25,7 @@ import { useAuthContext } from '../../context/AuthContext';
 import { useBusinessContext } from '../../context/BusinessContext';
 import { useAppContext } from '../../context/AppContext';
 import { useTemplates } from '../../hooks/useTemplates';
-import { DISCOUNT_TYPE } from '../../utils/constants';
+import { DISCOUNT_TYPE, PAYMENT_METHOD, PAYMENT_METHOD_LABEL } from '../../utils/constants';
 import { colors } from '../../theme/colors';
 import { openUpgradeEmail, openSuspendedEmail } from '../../utils/contactHelper';
 import { logError } from '../../utils/errorUtils';
@@ -56,6 +56,7 @@ export default function QuoteFormScreen({ navigation, route }) {
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState(DISCOUNT_TYPE.FIXED);
   const [advance, setAdvance] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
@@ -85,6 +86,7 @@ export default function QuoteFormScreen({ navigation, route }) {
       setDiscount(existingQuote.discount ? String(existingQuote.discount) : '');
       setDiscountType(existingQuote.discountType ?? DISCOUNT_TYPE.FIXED);
       setAdvance(existingQuote.advance ? String(existingQuote.advance) : '');
+      setPaymentMethod(existingQuote.paymentMethod ?? null);
       setNotes(existingQuote.notes ?? '');
     }
   }, []);
@@ -204,6 +206,7 @@ export default function QuoteFormScreen({ navigation, route }) {
         discountAmount,
         advance: parseFloat(advance) || 0,
         total,
+        paymentMethod: paymentMethod || null,
         notes: notes.trim() || null,
         validUntil: calcValidUntil(business?.validityDays ?? 30),
       };
@@ -221,6 +224,7 @@ export default function QuoteFormScreen({ navigation, route }) {
         setDiscount('');
         setDiscountType(DISCOUNT_TYPE.FIXED);
         setAdvance('');
+        setPaymentMethod(null);
         setNotes('');
         showSnackbar('Presupuesto creado', 'success');
         navigation.navigate('QuoteDetail', { quoteId });
@@ -375,6 +379,28 @@ export default function QuoteFormScreen({ navigation, route }) {
               />
             </View>
           )}
+
+          {/* Sección: Método de pago */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>MÉTODO DE PAGO (OPCIONAL)</Text>
+            <View style={styles.paymentMethodsRow}>
+              {Object.values(PAYMENT_METHOD).map(method => {
+                const active = paymentMethod === method;
+                return (
+                  <TouchableOpacity
+                    key={method}
+                    style={[styles.paymentChip, active && styles.paymentChipActive]}
+                    onPress={() => setPaymentMethod(active ? null : method)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.paymentChipText, active && styles.paymentChipTextActive]}>
+                      {PAYMENT_METHOD_LABEL[method]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Sección: Notas */}
           <View style={styles.section}>
@@ -582,6 +608,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.error,
     marginLeft: 4,
+  },
+  // Selector de método de pago
+  paymentMethodsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  paymentChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  paymentChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  paymentChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  paymentChipTextActive: {
+    color: colors.primary,
   },
   sectionLabelRow: {
     flexDirection: 'row',

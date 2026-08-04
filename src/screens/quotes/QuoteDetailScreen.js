@@ -20,7 +20,7 @@ import { shouldPromptAfterWhatsAppReturn } from '../../utils/whatsappFollowUp';
 import { getStatusActions } from '../../utils/quoteStatus';
 import { useQuotes } from '../../hooks/useQuotes';
 import { useAppContext } from '../../context/AppContext';
-import { QUOTE_STATUS_LABEL, DISCOUNT_TYPE } from '../../utils/constants';
+import { QUOTE_STATUS_LABEL, DISCOUNT_TYPE, PAYMENT_METHOD_LABEL } from '../../utils/constants';
 import { formatCurrency, formatDate, formatQuoteNumber } from '../../utils/formatters';
 import { colors } from '../../theme/colors';
 
@@ -349,6 +349,15 @@ export default function QuoteDetailScreen({ navigation, route }) {
             <Text variant="bodyMedium">{formatCurrency(quote.subtotal ?? 0)}</Text>
           </View>
 
+          {!!quote.paymentMethod && (
+            <View style={styles.totalLine}>
+              <Text variant="bodyMedium" style={styles.totalLabel}>Método de pago</Text>
+              <Text variant="bodyMedium" style={{ fontWeight: '600', color: colors.text }}>
+                {PAYMENT_METHOD_LABEL[quote.paymentMethod] ?? quote.paymentMethod}
+              </Text>
+            </View>
+          )}
+
           {(quote.discount ?? 0) > 0 && (
             <View style={styles.totalLine}>
               <Text variant="bodyMedium" style={styles.totalLabel}>
@@ -471,7 +480,7 @@ export default function QuoteDetailScreen({ navigation, route }) {
               <MaterialCommunityIcons name="file-pdf-box" size={22} color="#fff" />
               <MaterialCommunityIcons name="whatsapp" size={22} color="#fff" />
               <Text variant="labelLarge" style={styles.whatsappLabel}>
-                Enviar PDF por WhatsApp
+                Enviar al cliente
               </Text>
             </TouchableOpacity>
             <Text variant="bodySmall" style={styles.whatsappHint}>

@@ -1,14 +1,6 @@
-import { DISCOUNT_TYPE, QUOTE_STATUS_LABEL } from './constants';
+import { DISCOUNT_TYPE, PAYMENT_METHOD, PAYMENT_METHOD_LABEL } from './constants';
 import { formatDateAR } from './dateUtils';
 import { APP_CONFIG } from '../config/appConfig';
-
-const STATUS_COLOR = {
-  draft: '#868E96',
-  sent: '#339AF0',
-  accepted: '#40C057',
-  rejected: '#FA5252',
-  paid: '#20C997',
-};
 
 // Conservative thresholds — accounts for row height variability (long descriptions wrap)
 const ITEMS_FIRST_PAGE = APP_CONFIG.pdf.firstPageItems;
@@ -28,7 +20,7 @@ function fmtDate(ts) {
 }
 
 function padNum(n) {
-  return '#' + String(n ?? 0).padStart(4, '0');
+  return '#' + String(n ?? 0).padStart(5, '0');
 }
 
 // Split items into page buckets: first page gets fewer items to leave room for the header block
@@ -86,8 +78,6 @@ export function buildQuoteHTML(quote) {
   const advance = quote.advance ?? 0;
   const saldo = Math.max(0, total - advance);
 
-  const statusLabel = QUOTE_STATUS_LABEL[quote.status] ?? quote.status;
-  const statusColor = STATUS_COLOR[quote.status] ?? '#868E96';
   const quoteNumStr = padNum(quote.quoteNumber);
   const todayStr = fmtDate({ seconds: Math.floor(Date.now() / 1000) });
 
@@ -144,6 +134,20 @@ export function buildQuoteHTML(quote) {
        </div>`
     : '';
 
+  const paymentMethodBlock = quote.paymentMethod
+    ? `<div class="block-section">
+        <div class="label-sm">MÉTODO DE PAGO</div>
+        <div class="payment-methods">
+          ${Object.values(PAYMENT_METHOD)
+            .map(method => {
+              const active = method === quote.paymentMethod;
+              return `<span class="payment-chip${active ? ' payment-chip-active' : ''}">${active ? '&#10003; ' : ''}${PAYMENT_METHOD_LABEL[method]}</span>`;
+            })
+            .join('')}
+        </div>
+       </div>`
+    : '';
+
   // Totals + notes + conditions wrapped together so they never split across pages
   const finalBlock = `
   <div class="final-block">
@@ -157,6 +161,7 @@ export function buildQuoteHTML(quote) {
     </div>
     ${notesBlock}
     ${conditionsBlock}
+    ${paymentMethodBlock}
   </div>`;
 
   const pages = splitIntoPages(items);
@@ -181,8 +186,8 @@ export function buildQuoteHTML(quote) {
            </div>
            <div class="meta-row-outer">
              <div class="meta-left">
+               <div class="label-sm" style="margin-bottom:2px;">Presupuesto N°:</div>
                <div class="quote-num">${quoteNumStr}</div>
-               <span class="status-badge" style="background:${statusColor}22;color:${statusColor};">${statusLabel}</span>
              </div>
              <div class="meta-right">
                <div class="meta-line"><span class="meta-key">Fecha</span>${fmtDate(quote.createdAt)}</div>
@@ -229,7 +234,7 @@ export function buildQuoteHTML(quote) {
     color: #212529;
     background: #fff;
     padding: 36px 44px;
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.5;
   }
 
@@ -259,12 +264,12 @@ export function buildQuoteHTML(quote) {
   }
   .header-nologo .biz-block { flex: 1; }
   .logo-slot { flex-shrink: 0; }
-  .logo-slot img { max-width: 88px; max-height: 66px; object-fit: contain; display: block; }
+  .logo-slot img { max-width: 155px; max-height: 125px; object-fit: contain; display: block; }
   .biz-block { flex: 1; text-align: right; }
   .header-nologo .biz-block { text-align: left; }
-  .biz-name { font-size: 22px; font-weight: 700; color: #212529; margin-bottom: 3px; }
-  .biz-owner { font-size: 13px; color: #495057; margin-bottom: 6px; }
-  .biz-contact { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #495057; line-height: 1.7; }
+  .biz-name { font-size: 26px; font-weight: 700; color: #212529; margin-bottom: 3px; }
+  .biz-owner { font-size: 14px; color: #495057; margin-bottom: 6px; }
+  .biz-contact { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #495057; line-height: 1.7; }
   .biz-contact span { display: block; }
 
   /* ── Meta row (quote number + dates) ── */
@@ -279,24 +284,15 @@ export function buildQuoteHTML(quote) {
     margin-bottom: 20px;
   }
   .meta-left { display: flex; flex-direction: column; gap: 6px; }
-  .quote-num { font-size: 30px; font-weight: 800; color: #212529; letter-spacing: -0.5px; }
-  .status-badge {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    width: fit-content;
-  }
+  .quote-num { font-size: 22px; font-weight: 800; color: #212529; letter-spacing: -0.3px; }
   .meta-right { text-align: right; }
-  .meta-line { font-size: 13px; color: #495057; line-height: 2; }
+  .meta-line { font-size: 14px; color: #495057; line-height: 2; }
   .meta-key { font-weight: 600; color: #212529; margin-right: 6px; }
 
   /* ── Section helpers ── */
   .section-divider { height: 1px; background: #E9ECEF; margin: 16px 0; }
   .label-sm {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: #868E96;
     letter-spacing: 1.4px;
@@ -312,8 +308,8 @@ export function buildQuoteHTML(quote) {
     background: #F8F9FA;
     border-radius: 0 8px 8px 0;
   }
-  .client-name { font-size: 16px; font-weight: 700; color: #212529; margin-bottom: 3px; }
-  .client-detail { font-size: 12px; color: #495057; line-height: 1.8; }
+  .client-name { font-size: 18px; font-weight: 700; color: #212529; margin-bottom: 3px; }
+  .client-detail { font-size: 13px; color: #495057; line-height: 1.8; }
 
   /* ── Table ── */
   table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
@@ -321,7 +317,7 @@ export function buildQuoteHTML(quote) {
     background: #3B5BDB;
     color: #fff;
     padding: 9px 12px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.6px;
     text-transform: uppercase;
@@ -338,7 +334,7 @@ export function buildQuoteHTML(quote) {
   tbody td {
     padding: 9px 12px;
     border-bottom: 1px solid #E9ECEF;
-    font-size: 13px;
+    font-size: 14px;
     vertical-align: middle;
     color: #343A40;
   }
@@ -356,20 +352,21 @@ export function buildQuoteHTML(quote) {
     justify-content: space-between;
     align-items: center;
     padding: 8px 16px;
-    font-size: 13px;
+    font-size: 14px;
     color: #495057;
     border-bottom: 1px solid #F1F3F5;
   }
   .tot-row:last-child { border-bottom: none; }
   .tot-main {
-    padding: 12px 16px;
-    font-size: 16px;
+    padding: 14px 16px;
+    font-size: 22px;
     font-weight: 800;
     color: #3B5BDB;
     background: #EEF2FF;
+    border-top: 2px solid #3B5BDB;
     border-bottom: none;
   }
-  .tot-saldo { background: #F8F9FA; font-weight: 600; }
+  .tot-saldo { background: #F8F9FA; font-weight: 700; font-size: 15px; }
   .amount-neg { color: #FA5252; }
   .amount-saldo { color: #339AF0; font-weight: 700; }
 
@@ -380,11 +377,28 @@ export function buildQuoteHTML(quote) {
     border-left: 3px solid #3B5BDB;
     border-radius: 0 8px 8px 0;
     padding: 12px 16px;
-    font-size: 13px;
+    font-size: 14px;
     color: #343A40;
     line-height: 1.7;
   }
-  .callout-grey { border-left-color: #ADB5BD; color: #495057; font-size: 12px; }
+  .callout-grey { border-left-color: #ADB5BD; color: #495057; font-size: 13px; }
+
+  /* ── Método de pago ── */
+  .payment-methods { display: flex; flex-wrap: wrap; gap: 8px; }
+  .payment-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #DEE2E6;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ADB5BD;
+  }
+  .payment-chip-active {
+    border-color: #3B5BDB;
+    background: #EEF2FF;
+    color: #3B5BDB;
+  }
 
   /* ── Continuation header (pages 2+) ── */
   .continuation-header {
@@ -395,8 +409,8 @@ export function buildQuoteHTML(quote) {
     margin-bottom: 20px;
     border-bottom: 2px solid #3B5BDB;
   }
-  .biz-name-sm { font-size: 16px; font-weight: 700; color: #3B5BDB; }
-  .continuation-label { font-size: 12px; color: #868E96; font-style: italic; }
+  .biz-name-sm { font-size: 17px; font-weight: 700; color: #3B5BDB; }
+  .continuation-label { font-size: 13px; color: #868E96; font-style: italic; }
 
   /* ── Page footer ── */
   .page-footer {
@@ -404,7 +418,7 @@ export function buildQuoteHTML(quote) {
     padding-top: 10px;
     border-top: 1px solid #DEE2E6;
     text-align: center;
-    font-size: 11px;
+    font-size: 12px;
     color: #ADB5BD;
     letter-spacing: 0.3px;
   }

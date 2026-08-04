@@ -53,6 +53,22 @@ export const DISCOUNT_TYPE = {
   PERCENT: 'percent',
 };
 
+/** Métodos de pago seleccionables (opcional) para un presupuesto. */
+export const PAYMENT_METHOD = {
+  EFECTIVO: 'efectivo',
+  TRANSFERENCIA: 'transferencia',
+  TARJETA: 'tarjeta',
+  CHEQUE: 'cheque',
+};
+
+/** Etiquetas en español para mostrar en la UI y el PDF. */
+export const PAYMENT_METHOD_LABEL = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  tarjeta: 'Tarjeta de crédito',
+  cheque: 'Cheque',
+};
+
 /** Opciones de unidad de medida para los ítems de plantillas. */
 export const UNIT_OPTIONS = [
   'unidad',
