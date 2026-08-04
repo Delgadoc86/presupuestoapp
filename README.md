@@ -7,6 +7,39 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.10 (2026-08-04)
+
+**PDF: jerarquía visual, logo, y método de pago:**
+
+- Tamaños de letra del PDF reforzados en toda la jerarquía (nombre del negocio,
+  cliente, tabla de ítems, labels) y el TOTAL ahora destaca con 22px y borde
+  superior en vez de competir en tamaño con el resto.
+- Logo del negocio agrandado (155×125px) y número de presupuesto a 5 dígitos
+  con label "PRESUPUESTO N°:" arriba, en letra más chica y legible.
+- Se quita el badge de estado (Borrador/Enviado/etc.) del PDF: es información
+  interna de la app, sin valor para el cliente que recibe el documento.
+- Nuevo campo opcional **método de pago** (efectivo, transferencia, tarjeta de
+  crédito, cheque) en el presupuesto: seleccionable en el formulario, visible
+  en el detalle y en el PDF (marcado sobre las 4 opciones). Presupuestos
+  creados antes de esta versión no se ven afectados — el campo es aditivo y
+  no requirió cambios en `firestore.rules` ni en `quotes.service.js`.
+
+**Historial:**
+
+- Corregido un problema visual donde la fila de filtros rápidos ("Necesitan
+  seguimiento" / Estado / Fecha) quedaba pegada contra la lista de abajo.
+
+**Panel admin:**
+
+- "Último acceso" y "Este mes" ahora muestran datos reales para todas las
+  cuentas (antes "Último acceso" siempre decía "Nunca", y "Este mes" quedaba
+  en 0 para cuentas Pro). Se resuelve con una nueva Cloud Function de solo
+  lectura (`getAdminUserStats`, gateada por admin) que lee `lastSignInTime` de
+  Firebase Auth y cuenta presupuestos del mes vía Admin SDK — sin escribir
+  nada en los documentos de usuario ni tocar `firestore.rules`.
+- Nuevo índice compuesto en `quotes` (`userId` + `createdAt` ascendente) para
+  esa consulta de conteo.
+
 ### v1.0.9 (2026-07-27)
 
 **Corrección del alta y recuperación del onboarding:**

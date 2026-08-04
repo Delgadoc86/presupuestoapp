@@ -25,6 +25,48 @@ async function deleteOwnedCollection(db, collectionName, uid) {
   }
 }
 
+// Solo-lectura: no escribe nada en users/ ni quotes/. Le da al panel admin
+// datos que Firestore no puede exponerle vía reglas de cliente (lastSignInTime
+// vive en Auth, no en Firestore; y las reglas de quotes no dejan al admin leer
+// presupuestos ajenos). Bypassa reglas porque corre con el Admin SDK.
+exports.getAdminUserStats = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Debés iniciar sesión.');
+  }
+
+  const db = getFirestore();
+  const callerIsAdmin = (await db.doc(`admins/${request.auth.uid}`).get()).exists;
+  if (!callerIsAdmin) {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede ver estas estadísticas.');
+  }
+
+  const usersSnap = await db.collection('users').select().get();
+  const uids = usersSnap.docs.map((d) => d.id);
+
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const stats = {};
+  await Promise.all(
+    uids.map(async (uid) => {
+      const [authUser, countSnap] = await Promise.all([
+        getAuth().getUser(uid).catch(() => null),
+        db.collection('quotes')
+          .where('userId', '==', uid)
+          .where('createdAt', '>=', startOfMonth)
+          .count()
+          .get(),
+      ]);
+      stats[uid] = {
+        lastLoginAt: authUser?.metadata?.lastSignInTime ?? null,
+        quotesThisMonth: countSnap.data().count,
+      };
+    })
+  );
+
+  return stats;
+});
+
 exports.deleteCurrentUserAccount = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Debés iniciar sesión para eliminar la cuenta.');

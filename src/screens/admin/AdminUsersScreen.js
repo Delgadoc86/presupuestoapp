@@ -311,8 +311,9 @@ export default function AdminUsersScreen({ navigation }) {
     const isDemo       = status === 'demo';
 
     const createdAt  = formatDateAR(u.createdAt);
-    // Preferir lastLoginAt (si existe), caer a lastAccessAt
-    const lastLogin  = formatRelativeTime(u.lastLoginAt ?? u.lastAccessAt);
+    // lastLoginAt viene de Firebase Auth (metadata.lastSignInTime), mezclado
+    // en useAdminUsers vía la Cloud Function getAdminUserStats.
+    const lastLogin  = formatRelativeTime(u.lastLoginAt);
 
     return (
       <Surface style={styles.userCard} elevation={1}>
@@ -391,7 +392,7 @@ export default function AdminUsersScreen({ navigation }) {
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Este mes</Text>
             <Text style={styles.statValue}>
-              {u.quotesThisMonth ?? 0} / {isProActive ? '∞' : (u.quoteLimit ?? APP_CONFIG.demoQuoteLimit)}
+              {u.quotesThisMonthLive ?? u.quotesThisMonth ?? 0} / {isProActive ? '∞' : (u.quoteLimit ?? APP_CONFIG.demoQuoteLimit)}
             </Text>
           </View>
           <View style={styles.statDivider} />

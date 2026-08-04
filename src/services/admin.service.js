@@ -1,9 +1,28 @@
 import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '../../firebase.config';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../firebase.config';
 import { timestampToDate, addDays } from '../utils/dateUtils';
 import { isEffectivelyPro } from '../utils/planStatus';
 import { APP_CONFIG } from '../config/appConfig';
 import { logError } from '../utils/errorUtils';
+
+/**
+ * Estadísticas de solo lectura por usuario (último acceso real de Firebase
+ * Auth, presupuestos del mes actual contados en vivo) que Firestore no puede
+ * exponerle al admin directamente — ver functions/index.js:getAdminUserStats.
+ *
+ * @returns {Promise<Object<string, {lastLoginAt: string|null, quotesThisMonth: number}>>}
+ */
+export async function fetchAdminUserStats() {
+  try {
+    const getStats = httpsCallable(functions, 'getAdminUserStats');
+    const result = await getStats();
+    return result.data ?? {};
+  } catch (error) {
+    logError('fetchAdminUserStats', error);
+    throw error;
+  }
+}
 
 /**
  * Baja un usuario a plan Demo.
