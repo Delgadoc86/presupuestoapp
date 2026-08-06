@@ -210,7 +210,7 @@ export function buildQuoteHTML(quote) {
 
       const footer = `
       <div class="page-footer">
-        Generado con <strong>PresúFácil</strong> &nbsp;·&nbsp; ${todayStr} &nbsp;·&nbsp; Página ${pageNum} de ${totalPages}
+        Generado con <strong>${APP_CONFIG.appName}</strong> &nbsp;·&nbsp; ${todayStr} &nbsp;·&nbsp; Página ${pageNum} de ${totalPages}
       </div>`;
 
       return `<div style="${breakStyle}">

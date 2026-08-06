@@ -17,6 +17,7 @@ import { loginWithEmail, getAuthErrorMessage } from '../../services/auth.service
 import { useAppContext } from '../../context/AppContext';
 import { openSupportEmail } from '../../utils/contactHelper';
 import { colors } from '../../theme/colors';
+import { APP_CONFIG } from '../../config/appConfig';
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
@@ -69,13 +70,16 @@ export default function LoginScreen({ navigation }) {
           {/* Marca */}
           <View style={styles.brand}>
             <View style={[styles.logo, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.logoText}>PF</Text>
+              <Text style={styles.logoText}>PDF</Text>
             </View>
             <Text variant="headlineMedium" style={styles.appName}>
-              PresuFácil
+              {APP_CONFIG.appName}
             </Text>
             <Text variant="bodyMedium" style={styles.tagline}>
-              Presupuestos profesionales en segundos
+              Presupuestos profesionales listos para enviar
+            </Text>
+            <Text variant="bodySmall" style={styles.transitionNote}>
+              PresuPDF, antes PresuFácil
             </Text>
           </View>
 
@@ -140,7 +144,7 @@ export default function LoginScreen({ navigation }) {
           {/* Soporte */}
           <TouchableOpacity
             style={styles.supportLink}
-            onPress={() => openSupportEmail('Consulta sobre PresúFácil', '')}
+            onPress={() => openSupportEmail(`Consulta sobre ${APP_CONFIG.appName}`, '')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.supportText}>¿Tenés dudas? Escribinos</Text>
@@ -175,7 +179,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoText: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -185,6 +189,9 @@ const styles = StyleSheet.create({
   },
   tagline: {
     color: colors.textSecondary,
+  },
+  transitionNote: {
+    color: colors.textMuted,
   },
   form: {
     gap: 16,
