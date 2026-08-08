@@ -7,6 +7,39 @@ Diseñada para autónomos y pequeños negocios que necesitan emitir presupuestos
 
 ## Versiones
 
+### v1.0.11 (2026-08-07)
+
+**PDF: paginación por altura real de contenido, no por cantidad fija:**
+
+- Reemplazado el esquema de paginación fijo (11 ítems en la primera página, 18
+  en las siguientes) por un algoritmo de reparto parejo: máximo 9 ítems por
+  página, y si la última página quedaría con un solo ítem "huérfano", se le
+  presta uno a la página anterior (ej. 15 ítems → 9 + 6 + 2, nunca 9 + 9 + 1).
+  Ver `splitIntoPages()` en `src/utils/pdfTemplate.js` y
+  `APP_CONFIG.pdf.maxItemsPerPage` en `src/config/appConfig.js`.
+- Compactación de paddings y márgenes del PDF (encabezado, caja de
+  número/fecha, cliente, filas de tabla, totales, notas/condiciones/método de
+  pago, footer) para aprovechar mejor la hoja sin perder legibilidad ni tocar
+  tamaños de fuente.
+- El bloque final (totales + notas + condiciones + método de pago) ya no es
+  una única unidad infragmentable: ahora solo sus sub-bloques (caja de
+  totales, cada bloque de notas/condiciones/método de pago) se mantienen
+  unidos, evitando el hueco vacío que se generaba cuando ese conjunto
+  completo no entraba en el resto de la primera hoja.
+- Nuevo margen superior (20mm) en el encabezado de las páginas de
+  continuación (2da hoja en adelante), que antes quedaba pegado al borde
+  físico de la hoja.
+
+**PDF: robustez ante datos de usuario:**
+
+- Todo campo de texto libre del PDF (nombre y contacto del negocio, nombre
+  de cliente, descripción de ítems, notas, condiciones generales) ahora se
+  escapa antes de insertarse en el HTML, evitando que un dato con `<`, `>`,
+  `&`, comillas, etc. rompa el marcado del documento o inyecte contenido no
+  deseado.
+- Ítems sin `quantity` o `unitPrice` (dato incompleto/legacy) ya no muestran
+  "undefined" o "$ NaN" en el PDF — se calculan como 0.
+
 ### v1.0.10 (2026-08-04)
 
 **PDF: jerarquía visual, logo, y método de pago:**
@@ -175,7 +208,7 @@ La explicación breve para clientes y profesionales está en [`GUIA_RAPIDA_CLIEN
 
 **Deuda técnica — centralización:**
 
-- `src/config/appConfig.js`: fuente única de constantes (`demoQuoteLimit`, `proDurations`, `pdf.firstPageItems`, `supportEmail`, etc.).
+- `src/config/appConfig.js`: fuente única de constantes (`demoQuoteLimit`, `proDurations`, `pdf.maxItemsPerPage`, `supportEmail`, etc.).
 - `src/utils/dateUtils.js`: `timestampToDate()`, `formatDateAR()`, `addDays()`, `getDaysRemaining()`, `formatRelativeTime()`. Elimina 5+ patrones duplicados en servicios y pantallas.
 - `src/utils/planStatus.js` reescrito: `getPlanStatus()` devuelve objeto rico (`status`, `isProActive`, `canCreateQuote`, `remainingDays`, `demoRemainingQuotes`, etc.) en lugar de un string.
 - `src/utils/errorUtils.js`: `logError()` centralizado (solo loguea en `__DEV__`; hook para Sentry futuro).

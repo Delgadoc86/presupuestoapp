@@ -2,9 +2,16 @@ import { DISCOUNT_TYPE, PAYMENT_METHOD, PAYMENT_METHOD_LABEL } from './constants
 import { formatDateAR } from './dateUtils';
 import { APP_CONFIG } from '../config/appConfig';
 
-// Conservative thresholds — accounts for row height variability (long descriptions wrap)
-const ITEMS_FIRST_PAGE = APP_CONFIG.pdf.firstPageItems;
-const ITEMS_PER_PAGE = APP_CONFIG.pdf.itemsPerPage;
+const MAX_ITEMS_PER_PAGE = APP_CONFIG.pdf.maxItemsPerPage;
+
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+// Texto libre (nombres, descripciones, notas) va siempre por acá antes de
+// interpolarse en el HTML — evita que un dato de usuario rompa el marcado
+// o inyecte contenido no deseado en el PDF.
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
 
 function fmt(n) {
   return new Intl.NumberFormat('es-AR', {
@@ -23,15 +30,25 @@ function padNum(n) {
   return '#' + String(n ?? 0).padStart(5, '0');
 }
 
-// Split items into page buckets: first page gets fewer items to leave room for the header block
+// Split items into page buckets: max MAX_ITEMS_PER_PAGE per page, but never
+// leave the last page with a single lonely item — borrow one from the page before it.
 function splitIntoPages(items) {
-  if (items.length === 0) return [[]];
+  const n = items.length;
+  if (n === 0) return [[]];
+  if (n <= MAX_ITEMS_PER_PAGE) return [items];
+
+  const pageCount = Math.ceil(n / MAX_ITEMS_PER_PAGE);
+  const sizes = new Array(pageCount).fill(MAX_ITEMS_PER_PAGE);
+  sizes[pageCount - 1] = n - MAX_ITEMS_PER_PAGE * (pageCount - 1);
+
+  if (sizes[pageCount - 1] === 1) {
+    sizes[pageCount - 2] -= 1;
+    sizes[pageCount - 1] += 1;
+  }
+
   const pages = [];
   let remaining = [...items];
-  pages.push(remaining.splice(0, ITEMS_FIRST_PAGE));
-  while (remaining.length > 0) {
-    pages.push(remaining.splice(0, ITEMS_PER_PAGE));
-  }
+  for (const size of sizes) pages.push(remaining.splice(0, size));
   return pages;
 }
 
@@ -40,10 +57,10 @@ function buildTableRows(items) {
     .map(
       item => `
     <tr>
-      <td class="td-desc">${item.description ?? '—'}</td>
-      <td class="td-qty">${item.quantity}</td>
+      <td class="td-desc">${esc(item.description) || '—'}</td>
+      <td class="td-qty">${item.quantity ?? 0}</td>
       <td class="td-price">${fmt(item.unitPrice)}</td>
-      <td class="td-sub">${fmt(item.subtotal ?? item.quantity * item.unitPrice)}</td>
+      <td class="td-sub">${fmt(item.subtotal ?? (item.quantity ?? 0) * (item.unitPrice ?? 0))}</td>
     </tr>`
     )
     .join('');
@@ -84,18 +101,18 @@ export function buildQuoteHTML(quote) {
   const hasLogo = !!b.logoUrl;
   // Si hay nombre de empresa, se muestra grande y el nombre propio como subtítulo.
   // Si no hay empresa, el nombre propio es el título principal (sin subtítulo duplicado).
-  const displayBizName = b.businessName || b.ownerName || 'Mi negocio';
+  const displayBizName = esc(b.businessName || b.ownerName || 'Mi negocio');
   const showOwnerLine = !!(b.ownerName && b.businessName);
 
   const logoSlot = hasLogo
-    ? `<div class="logo-slot"><img src="${b.logoUrl}" alt="Logo" /></div>`
+    ? `<div class="logo-slot"><img src="${esc(b.logoUrl)}" alt="Logo" /></div>`
     : '';
 
   const bizLines = [
-    b.whatsapp && `<span>&#128222; ${b.whatsapp}</span>`,
-    b.email && `<span>${b.email}</span>`,
-    b.address && `<span>${b.address}</span>`,
-    b.cuit && `<span>CUIT: ${b.cuit}</span>`,
+    b.whatsapp && `<span>&#128222; ${esc(b.whatsapp)}</span>`,
+    b.email && `<span>${esc(b.email)}</span>`,
+    b.address && `<span>${esc(b.address)}</span>`,
+    b.cuit && `<span>CUIT: ${esc(b.cuit)}</span>`,
   ]
     .filter(Boolean)
     .join('');
@@ -123,14 +140,14 @@ export function buildQuoteHTML(quote) {
   const notesBlock = quote.notes
     ? `<div class="block-section">
         <div class="label-sm">NOTAS</div>
-        <div class="callout">${quote.notes.replace(/\n/g, '<br>')}</div>
+        <div class="callout">${esc(quote.notes).replace(/\n/g, '<br>')}</div>
        </div>`
     : '';
 
   const conditionsBlock = b.generalConditions
     ? `<div class="block-section">
         <div class="label-sm">CONDICIONES GENERALES</div>
-        <div class="callout callout-grey">${b.generalConditions.replace(/\n/g, '<br>')}</div>
+        <div class="callout callout-grey">${esc(b.generalConditions).replace(/\n/g, '<br>')}</div>
        </div>`
     : '';
 
@@ -180,7 +197,7 @@ export function buildQuoteHTML(quote) {
              ${logoSlot}
              <div class="biz-block">
                <div class="biz-name">${displayBizName}</div>
-               ${showOwnerLine ? `<div class="biz-owner">${b.ownerName}</div>` : ''}
+               ${showOwnerLine ? `<div class="biz-owner">${esc(b.ownerName)}</div>` : ''}
                <div class="biz-contact">${bizLines}</div>
              </div>
            </div>
@@ -197,12 +214,12 @@ export function buildQuoteHTML(quote) {
            <div class="section-divider"></div>
            <div class="label-sm">PRESUPUESTO A</div>
            <div class="client-box">
-             <div class="client-name">${c.name ?? '—'}</div>
-             ${c.phone ? `<div class="client-detail">&#128222; ${c.phone}</div>` : ''}
-             ${c.email ? `<div class="client-detail">${c.email}</div>` : ''}
+             <div class="client-name">${esc(c.name) || '—'}</div>
+             ${c.phone ? `<div class="client-detail">&#128222; ${esc(c.phone)}</div>` : ''}
+             ${c.email ? `<div class="client-detail">${esc(c.email)}</div>` : ''}
            </div>
            <div class="label-sm" style="margin-bottom:10px;">DETALLE DE ÍTEMS</div>`
-        : `<div class="accent-bar"></div>
+        : `<div class="accent-bar accent-bar-continuation"></div>
            <div class="continuation-header">
              <span class="biz-name-sm">${displayBizName}</span>
              <span class="continuation-label">Presupuesto ${quoteNumStr} — continuación (pág. ${pageNum} de ${totalPages})</span>
@@ -240,8 +257,7 @@ export function buildQuoteHTML(quote) {
 
   /* Never split a table row across pages */
   tr { page-break-inside: avoid; break-inside: avoid; }
-  /* Keep totals + notes + conditions as one block */
-  .final-block { page-break-inside: avoid; break-inside: avoid; }
+  /* final-block itself can split across pages; its sub-blocks below stay intact */
   /* Repeat thead on every printed page */
   thead { display: table-header-group; }
 
@@ -252,19 +268,21 @@ export function buildQuoteHTML(quote) {
     border-radius: 2px;
     margin-bottom: 28px;
   }
+  /* Extra aire arriba solo en páginas de continuación (2+), la barra queda muy pegada al borde físico de la hoja */
+  .accent-bar-continuation { margin-top: 20mm; }
 
   /* ── Page 1 header ── */
   .page-header {
     display: flex;
     align-items: flex-start;
     gap: 20px;
-    padding-bottom: 22px;
-    margin-bottom: 22px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
     border-bottom: 1px solid #DEE2E6;
   }
   .header-nologo .biz-block { flex: 1; }
   .logo-slot { flex-shrink: 0; }
-  .logo-slot img { max-width: 155px; max-height: 125px; object-fit: contain; display: block; }
+  .logo-slot img { max-width: 155px; max-height: 100px; object-fit: contain; display: block; }
   .biz-block { flex: 1; text-align: right; }
   .header-nologo .biz-block { text-align: left; }
   .biz-name { font-size: 26px; font-weight: 700; color: #212529; margin-bottom: 3px; }
@@ -280,7 +298,7 @@ export function buildQuoteHTML(quote) {
     background: #F8F9FA;
     border: 1px solid #E9ECEF;
     border-radius: 10px;
-    padding: 16px 22px;
+    padding: 10px 22px;
     margin-bottom: 20px;
   }
   .meta-left { display: flex; flex-direction: column; gap: 6px; }
@@ -290,21 +308,21 @@ export function buildQuoteHTML(quote) {
   .meta-key { font-weight: 600; color: #212529; margin-right: 6px; }
 
   /* ── Section helpers ── */
-  .section-divider { height: 1px; background: #E9ECEF; margin: 16px 0; }
+  .section-divider { height: 1px; background: #E9ECEF; margin: 10px 0; }
   .label-sm {
     font-size: 11px;
     font-weight: 700;
     color: #868E96;
     letter-spacing: 1.4px;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   /* ── Client box ── */
   .client-box {
     border-left: 3px solid #3B5BDB;
     padding: 10px 14px;
-    margin-bottom: 22px;
+    margin-bottom: 14px;
     background: #F8F9FA;
     border-radius: 0 8px 8px 0;
   }
@@ -312,7 +330,7 @@ export function buildQuoteHTML(quote) {
   .client-detail { font-size: 13px; color: #495057; line-height: 1.8; }
 
   /* ── Table ── */
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
   thead th {
     background: #3B5BDB;
     color: #fff;
@@ -332,7 +350,7 @@ export function buildQuoteHTML(quote) {
   tbody tr:nth-child(even) { background: #F8F9FA; }
   tbody tr:hover { background: #EEF2FF; }
   tbody td {
-    padding: 9px 12px;
+    padding: 6px 12px;
     border-bottom: 1px solid #E9ECEF;
     font-size: 14px;
     vertical-align: middle;
@@ -345,8 +363,15 @@ export function buildQuoteHTML(quote) {
   .td-sub { text-align: right; font-weight: 600; color: #212529; }
 
   /* ── Totals ── */
-  .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 24px; }
-  .totals-box { width: 280px; border: 1px solid #DEE2E6; border-radius: 10px; overflow: hidden; }
+  .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .totals-box {
+    width: 280px;
+    border: 1px solid #DEE2E6;
+    border-radius: 10px;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   .tot-row {
     display: flex;
     justify-content: space-between;
@@ -371,7 +396,11 @@ export function buildQuoteHTML(quote) {
   .amount-saldo { color: #339AF0; font-weight: 700; }
 
   /* ── Notes / conditions ── */
-  .block-section { margin-bottom: 18px; }
+  .block-section {
+    margin-bottom: 12px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   .callout {
     background: #F8F9FA;
     border-left: 3px solid #3B5BDB;
@@ -414,7 +443,7 @@ export function buildQuoteHTML(quote) {
 
   /* ── Page footer ── */
   .page-footer {
-    margin-top: 30px;
+    margin-top: 14px;
     padding-top: 10px;
     border-top: 1px solid #DEE2E6;
     text-align: center;
